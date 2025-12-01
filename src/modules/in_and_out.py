@@ -73,7 +73,7 @@ class ToPixel(nn.Module):
         *,
         img_size: int | Tuple[int, ...],
         patch_size: int | Tuple[int, ...],
-        in_channels: int,
+        out_channels: int,
         in_dim: int,
         to_pixel: str = "conv",
     ) -> None:
@@ -85,9 +85,9 @@ class ToPixel(nn.Module):
         if to_pixel != "conv":
             raise ValueError(f"Unsupported to_pixel '{to_pixel}'")
         if self.dims == 2:
-            self.proj = nn.ConvTranspose2d(in_dim, in_channels, kernel_size=kernel, stride=stride)
+            self.proj = nn.ConvTranspose2d(in_dim, out_channels, kernel_size=kernel, stride=stride)
         else:
-            self.proj = nn.ConvTranspose3d(in_dim, in_channels, kernel_size=kernel, stride=stride)
+            self.proj = nn.ConvTranspose3d(in_dim, out_channels, kernel_size=kernel, stride=stride)
         self.patch_size = kernel
 
     def forward(self, tokens: torch.Tensor, img_size: Tuple[int, ...] | None = None) -> torch.Tensor:

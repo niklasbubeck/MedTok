@@ -235,27 +235,18 @@ code_url="https://github.com/MishaLaskin/vqvae/blob/d761a999e2267766400dc646d82d
 paper_url="https://arxiv.org/abs/1711.00937",)
 class VectorQuantizer2(nn.Module):
     """
-    Improved version over VectorQuantizer, can be used as a drop-in replacement. Mostly
-    avoids costly matrix multiplications and allows for post-hoc remapping of indices.
-    Supports optional EMA updates via use_ema parameter.
-
-    Args:
-        n_e: Number of embeddings
-        e_dim: Dimension of embedding
-        beta: Commitment cost used in loss term, beta * ||z_e(x)-sg[e]||^2
-        remap: Whether to remap indices
-        unknown_index: Index to use for unknown values
-        sane_index_shape: Whether to keep index shape sane
-        legacy: Whether to use legacy mode
-        rotation_trick: Whether to apply rotation trick, -> https://arxiv.org/pdf/2410.06424
-        use_norm: Whether to use normalization -> basically then measures distance by cosine similarity
-        use_ema: Whether to use EMA updates for embeddings
-        ema_decay: EMA decay rate
-        ema_eps: Epsilon value for numerical stability
+    Improved VectorQuantizer with optional EMA, rotation trick,
+    cosine normalization, and MaskGIT-style entropy loss.
     """
-    def __init__(self, n_e, e_dim, beta=0.25,
-                 legacy=True, rotation_trick: bool = False, 
-                 use_norm=False, use_ema=False, ema_decay=0.99, ema_eps=1e-5):
+    def __init__(
+        self, n_e, e_dim, beta=0.25,
+        legacy=True, rotation_trick=False,
+        use_norm=False, use_ema=False, ema_decay=0.99, ema_eps=1e-5,
+        # ---- NEW ENTROPY OPTIONS as in MaskGITs ----
+        entropy_loss_ratio=0.0,
+        entropy_loss_type="softmax",   # ["softmax", "gumbel"]
+        entropy_temperature=1.0
+    ):
         super().__init__()
         self.n_e = n_e
         self.e_dim = e_dim
@@ -264,6 +255,11 @@ class VectorQuantizer2(nn.Module):
         self.legacy = legacy
         self.rotation_trick = rotation_trick
         self.use_ema = use_ema
+
+        # Entropy hyperparameters
+        self.entropy_loss_ratio = entropy_loss_ratio
+        self.entropy_loss_type = entropy_loss_type
+        self.entropy_temperature = entropy_temperature
         
         if use_ema:
             self.embedding = EmbeddingEMA(self.n_e, self.e_dim, ema_decay, ema_eps)
@@ -275,72 +271,96 @@ class VectorQuantizer2(nn.Module):
     ## Ensure quantization is performed using fp32
     @autocast('cuda', enabled=False)
     def forward(self, z):
-        z=z.float()
-        # Reshape input to (B, H, W, C) or (B, D, H, W, C) style for distance computation
-        if z.ndim == 4:  # 2D
-            z = rearrange(z, 'b c h w -> b h w c').contiguous()
-        elif z.ndim == 5:  # 3D
-            z = rearrange(z, 'b c d h w -> b d h w c').contiguous()
-        else:  # already flattened or channel-last
-            pass
-            
-        z_flattened = z.view(-1, self.e_dim)
+        z = z.float()
 
-        z_flattened = self.norm(z_flattened)
+        # Put channel last (2D or 3D)
+        if z.ndim == 4:  
+            z = rearrange(z, 'b c h w -> b h w c')
+        elif z.ndim == 5: 
+            z = rearrange(z, 'b c d h w -> b d h w c')
+
+        z_flat = z.reshape(-1, self.e_dim)
+        z_flat = self.norm(z_flat)
+
         embedding = self.norm(self.embedding.weight)
 
-        # distances from z to embeddings e_j (z - e)^2 = z^2 + e^2 - 2 e * z
-        d = torch.sum(z_flattened ** 2, dim=1, keepdim=True) + \
-            torch.sum(embedding**2, dim=1) - 2 * \
-            torch.einsum('bd,dn->bn', z_flattened, rearrange(embedding, 'n d -> d n'))
+        # Compute distances (efficient MaskGIT/VQGAN style)
+        d = (
+            torch.sum(z_flat ** 2, dim=1, keepdim=True)
+            + torch.sum(embedding**2, dim=1)
+            - 2 * torch.einsum('bd,nd->bn', z_flat, embedding)
+        )
 
-        min_encoding_indices = torch.argmin(d, dim=1)
-        z_q = self.embedding(min_encoding_indices).view(z.shape)
-        z_q, z = self.norm(z_q), self.norm(z)
+        # Nearest neighbour lookup
+        min_indices = torch.argmin(d, dim=1)
+        z_q = self.embedding(min_indices).view_as(z)
+        z_q = self.norm(z_q)
+
         perplexity = None
         min_encodings = None
 
-        # Perform EMA update if enabled
+        # EMA update
         if self.use_ema:
-            encodings = F.one_hot(min_encoding_indices, self.n_e).type(z.dtype)
-            self.embedding.perform_ema_update(encodings, z_flattened, self.n_e)
-            avg_probs = torch.mean(encodings, dim=0)
+            onehot = F.one_hot(min_indices, self.n_e).type(z.dtype)
+            self.embedding.perform_ema_update(onehot, z_flat, self.n_e)
+
+            avg_probs = onehot.float().mean(0)
             perplexity = torch.exp(-torch.sum(avg_probs * torch.log(avg_probs + 1e-10)))
 
-        # compute loss for embedding
-        if not self.legacy:
-            loss = self.beta * torch.mean((z_q.detach()-z)**2) + \
-                   torch.mean((z_q - z.detach()) ** 2)
+        # Standard VQ loss
+        if self.legacy:
+            loss = torch.mean((z_q.detach() - z) ** 2) + \
+                   self.beta * torch.mean((z_q - z.detach()) ** 2)
         else:
-            loss = torch.mean((z_q.detach()-z)**2) + self.beta * \
+            loss = self.beta * torch.mean((z_q.detach() - z) ** 2) + \
                    torch.mean((z_q - z.detach()) ** 2)
 
+        # ---------------------------
+        #       ENTROPY LOSS  
+        # ---------------------------
+        entropy_loss = torch.tensor(0.0, device=z.device)
+
+        if self.entropy_loss_ratio > 0:
+            logits = -d  # MaskGIT uses negative distances as logits
+
+            if self.entropy_loss_type == "softmax":
+                probs = F.softmax(logits / self.entropy_temperature, dim=-1)
+            elif self.entropy_loss_type == "gumbel":
+                probs = F.gumbel_softmax(logits, tau=self.entropy_temperature, hard=False)
+            else:
+                raise ValueError(f"Invalid entropy_loss_type: {self.entropy_loss_type}")
+
+            # Entropy = -Σ p log p
+            entropy = -torch.sum(probs * torch.log(probs + 1e-10), dim=-1)
+
+            # MaskGIT penalizes *low entropy* (i.e., encourages diversity)
+            entropy_loss = -entropy.mean() * self.entropy_loss_ratio
+
+            loss = loss + entropy_loss
+
+        # Rotation trick or STE
         if self.rotation_trick:
-            # apply rotation trick -> https://arxiv.org/abs/2410.06424
             z_q = rotate_to(z, z_q)
-        else:     
-            # preserve gradients -> STE
+        else:
             z_q = z + (z_q - z).detach()
 
-        # Reshape back to original spatial dimensions
-        # z_q is already in the correct shape from line 297
+        # Restore shape (channel-first)
         if z.ndim == 4:
-            z_q = rearrange(z_q, 'b h w c -> b c h w').contiguous()
+            z_q = rearrange(z_q, 'b h w c -> b c h w')
         elif z.ndim == 5:
-            z_q = rearrange(z_q, 'b d h w c -> b c d h w').contiguous()
+            z_q = rearrange(z_q, 'b d h w c -> b c d h w')
 
-        return z_q, loss, (perplexity, min_encodings, min_encoding_indices)
+        return z_q, loss, {
+            "perplexity": perplexity,
+            "entropy_loss": entropy_loss,
+            "indices": min_indices,
+        }
 
-    def get_codebook_entry(self, indices, shape):
-
-        # get quantized latent vectors
+    def get_codebook_entry(self, indices, shape=None):
         z_q = self.embedding(indices)
-
         if shape is not None:
             z_q = z_q.view(shape)
-
-        z_q = self.norm(z_q)
-        return z_q
+        return self.norm(z_q)
 
 @register_model(f"{_REGISTRY_PREFIX}qinco_vector_quantizer",
 code_url="https://github.com/facebookresearch/Qinco",
@@ -369,9 +389,9 @@ class SimVQ(nn.Module):
 
     def __init__(
         self,
-        in_channels: int,
         n_e: int,
-        e_dim: int | None = None,
+        e_dim: int,
+        in_channels: int = None, # usually not used as we have quant conv
         codebook_transform: nn.Module | None = None,
         rotation_trick: bool = True,
         beta: float = 0.25,
@@ -379,8 +399,8 @@ class SimVQ(nn.Module):
     ):
         super().__init__()
         self.n_e = n_e
-        self.in_channels = in_channels
-        self.e_dim = e_dim or in_channels
+        self.in_channels = in_channels if in_channels is not None else e_dim
+        self.e_dim = e_dim
         self.rotation_trick = rotation_trick
         self.beta = beta
         self.commitment_weight = commitment_weight
@@ -391,7 +411,7 @@ class SimVQ(nn.Module):
 
         # linear projection from frozen codebook to actual quantized space
         if codebook_transform is None:
-            self.code_transform = nn.Linear(self.e_dim, in_channels, bias=False)
+            self.code_transform = nn.Linear(self.e_dim, self.in_channels, bias=False)
         else:
             self.code_transform = codebook_transform
 

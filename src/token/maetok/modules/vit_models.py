@@ -21,7 +21,7 @@ from .rope_utils import (
     init_random_2d_freqs, init_t_xy
 )
 
-from src.models.utils.in_and_out import PatchEmbed, ToPixel
+from src.modules.in_and_out import PatchEmbed, ToPixel
 
 
 class Attention(nn.Module):

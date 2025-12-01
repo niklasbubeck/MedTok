@@ -65,11 +65,11 @@ def _build_rope_tensor_1d(head_dim: int, seq_len: int) -> torch.Tensor:
 
 
 def get_rope_tensor_2d(head_dim: int, height: int, width: int) -> torch.Tensor:
-    return _build_rope_tensor_1d(head_dim, height * width)
+    return _build_rope_tensor_1d(head_dim * 2, height * width)
 
 
 def get_rope_tensor_3d(head_dim: int, depth: int, height: int, width: int) -> torch.Tensor:
-    return _build_rope_tensor_1d(head_dim, depth * height * width)
+    return _build_rope_tensor_1d(head_dim * 2, depth * height * width)
 
 
 def apply_rotary_emb(x: torch.Tensor, rope: torch.Tensor) -> torch.Tensor:

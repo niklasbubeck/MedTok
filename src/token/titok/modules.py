@@ -32,7 +32,7 @@ from accelerate.utils.operations import gather
 from torch.amp import autocast
 from typing import Mapping, Text, Tuple
 import numpy as np
-from src.models.utils.in_and_out import PatchEmbed, ToPixel
+from src.modules.in_and_out import PatchEmbed, ToPixel
 
 
 def modulate(x, shift, scale):

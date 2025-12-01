@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from timm import create_model
 
 from .modules import MAETokViTEncoder, MAETokViTDecoder, HOGGenerator
-from ...registry import register_model
+from src.registry import register_model
 
 __all__ = ['MAETok_B_128', 'MaskAEModel']
 

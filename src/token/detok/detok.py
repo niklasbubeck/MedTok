@@ -9,23 +9,16 @@ import torch.nn.functional as F
 from einops import rearrange
 from einops.layers.torch import Rearrange
 from torch import Tensor
-from src.models.utils.in_and_out import PatchEmbed, ToPixel
-from src.models.utils.pos_embed import get_rope_tensor_2d, get_rope_tensor_3d, apply_rotary_emb
+from src.modules.in_and_out import PatchEmbed, ToPixel
+from src.modules.pos_embed import get_rope_tensor_2d, get_rope_tensor_3d, apply_rotary_emb
 
-from src.modules import DiagonalGaussianDistribution
+from src.modules.gaussian_dist import DiagonalGaussianDistribution
 from src.utils import init_from_ckpt
-from ...registry import register_model
+from src.registry import register_model
 
 logger = logging.getLogger("DeTok")
 
 
-SIZE_DICT = {
-    "small": {"width": 512, "layers": 8, "heads": 8},
-    "base": {"width": 768, "layers": 12, "heads": 12},
-    "large": {"width": 1024, "layers": 24, "heads": 16},
-    "xl": {"width": 1152, "layers": 28, "heads": 16},
-    "huge": {"width": 1280, "layers": 32, "heads": 16},
-}
 
 # ================================
 # Utility Functions
@@ -113,52 +106,52 @@ class Encoder(nn.Module):
         self,
         img_size: int | tuple[int, ...] = 256,
         patch_size: int | tuple[int, ...] = 16,
-        input_channels: int = 3,
+        in_channels: int = 3,
         width: int = 768,
         depth: int = 12,
         num_heads: int = 12,
         token_channels: int = 16,
         mask_ratio: float = 0.75,
-        dimension: int = 2,
+        dims: int = 2,
         use_rope: bool = True,
     ) -> None:
         super().__init__()
         self.img_size = img_size
         self.patch_size = patch_size
-        self.dimension = dimension
+        self.dims = dims
         # needs to split into mean and std
         self.token_channels = token_channels * 2
         self.mask_ratio = mask_ratio
-        self.input_channels = input_channels
+        self.in_channels = in_channels
         
         # Handle different input formats
         if isinstance(img_size, int):
-            if dimension == 2:
+            if dims == 2:
                 self.img_size = (img_size, img_size)
-            elif dimension == 3:
+            elif dims == 3:
                 self.img_size = (img_size, img_size, img_size)
         else:
             self.img_size = img_size
             
         if isinstance(patch_size, int):
-            if dimension == 2:
+            if dims == 2:
                 self.patch_size = (patch_size, patch_size)
-            elif dimension == 3:
+            elif dims == 3:
                 self.patch_size = (patch_size, patch_size, patch_size)
         else:
             self.patch_size = patch_size
             
         # Calculate grid sizes
-        if dimension == 2:
+        if dims == 2:
             self.grid_size = (self.img_size[0] // self.patch_size[0], self.img_size[1] // self.patch_size[1])
             self.seq_len = self.grid_size[0] * self.grid_size[1]
-        elif dimension == 3:
+        elif dims == 3:
             self.grid_size = (self.img_size[0] // self.patch_size[0], 
                             self.img_size[1] // self.patch_size[1], 
                             self.img_size[2] // self.patch_size[2])
             self.seq_len = self.grid_size[0] * self.grid_size[1] * self.grid_size[2]
         else:
-            raise ValueError(f"Unsupported dimension: {dimension}")
+            raise ValueError(f"Unsupported dims: {dims}")
 
         num_layers, num_heads, width = depth, num_heads, width
         
@@ -166,7 +159,7 @@ class Encoder(nn.Module):
 
         # Patch embedding
         self.patch_embed = PatchEmbed(to_embed='conv', img_size=img_size, patch_size=patch_size, 
-                                     in_chans=input_channels, embed_dim=width)
+                                     in_chans=in_channels, embed_dim=width)
 
         # learnable embeddings
         scale = width**-0.5
@@ -182,11 +175,11 @@ class Encoder(nn.Module):
         self.latent_head = nn.Linear(width, self.token_channels)
 
         # rotary position embedding (only for 2D)
-        if dimension == 2 and use_rope:
+        if dims == 2 and use_rope:
             head_dim = self.transformer[0].attn.head_dim
             rope_tensor = get_rope_tensor_2d(head_dim, self.grid_size[0], self.grid_size[1]).unsqueeze(0)
             self.register_buffer("rope_tensor", rope_tensor, persistent=False)
-        elif dimension == 3 and use_rope:
+        elif dims == 3 and use_rope:
             head_dim = self.transformer[0].attn.head_dim
             rope_tensor = get_rope_tensor_3d(head_dim, self.grid_size[0], self.grid_size[1], self.grid_size[2]).unsqueeze(0)
             self.register_buffer("rope_tensor", rope_tensor, persistent=False)
@@ -222,7 +215,9 @@ class Encoder(nn.Module):
 
     def forward(self, x: Tensor, mask_ratio: float = -1):
         """forward pass through encoder."""
-        x = self.patch_embed(x) + self.positional_embedding
+        x = self.patch_embed(x)
+
+        x = x + self.positional_embedding
         x, _, ids_restore, rope = self.mae_random_masking(x, mask_ratio=mask_ratio)
 
         x = self.ln_pre(x)
@@ -242,53 +237,53 @@ class Decoder(nn.Module):
         self,
         img_size: int | tuple[int, ...] = 256,
         patch_size: int | tuple[int, ...] = 16,
+        out_channels: int = 3,
         width: int = 768,
         depth: int = 12,
         num_heads: int = 12,
         token_channels: int = 16,
-        input_channels: int = 3,
-        dimension: int = 2,
+        dims: int = 2,
         use_rope: bool = True,
     ) -> None:
         super().__init__()
         self.img_size = img_size
         self.patch_size = patch_size
-        self.dimension = dimension
+        self.dims = dims
         self.width = width
         self.depth = depth
         self.num_heads = num_heads
         self.token_channels = token_channels
-        
+        self.out_channels = out_channels
         # Handle different input formats
         if isinstance(img_size, int):
-            if dimension == 2:
+            if dims == 2:
                 self.img_size = (img_size, img_size)
-            elif dimension == 3:
+            elif dims == 3:
                 self.img_size = (img_size, img_size, img_size)
         else:
             self.img_size = img_size
             
         if isinstance(patch_size, int):
-            if dimension == 2:
+            if dims == 2:
                 self.patch_size = (patch_size, patch_size)
-            elif dimension == 3:
+            elif dims == 3:
                 self.patch_size = (patch_size, patch_size, patch_size)
         else:
             self.patch_size = patch_size
         
         # Calculate grid sizes
-        if dimension == 2:
+        if dims == 2:
             self.grid_size = (self.img_size[0] // self.patch_size[0], self.img_size[1] // self.patch_size[1])
             self.seq_len = self.grid_size[0] * self.grid_size[1]
             self.output_channels = 3
-        elif dimension == 3:
+        elif dims == 3:
             self.grid_size = (self.img_size[0] // self.patch_size[0], 
                             self.img_size[1] // self.patch_size[1], 
                             self.img_size[2] // self.patch_size[2])
             self.seq_len = self.grid_size[0] * self.grid_size[1] * self.grid_size[2]
             self.output_channels = 1  # For 3D, typically single channel
         else:
-            raise ValueError(f"Unsupported dimension: {dimension}")
+            raise ValueError(f"Unsupported dims: {dims}")
 
         num_layers, num_heads, width = depth, num_heads, width
 
@@ -308,14 +303,14 @@ class Decoder(nn.Module):
 
         # output layers
         # To pixel head
-        self.to_pixel = ToPixel(to_pixel="conv", img_size=self.img_size, in_channels=input_channels,
+        self.to_pixel = ToPixel(to_pixel="conv", img_size=self.img_size, out_channels=out_channels,
                                in_dim=width, patch_size=self.patch_size)
         # rotary position embedding
-        if dimension == 2 and use_rope:
+        if dims == 2 and use_rope:
             head_dim = self.transformer[0].attn.head_dim
             rope_tensor = get_rope_tensor_2d(head_dim, self.grid_size[0], self.grid_size[1]).unsqueeze(0)
             self.register_buffer("rope_tensor", rope_tensor, persistent=False)
-        elif dimension == 3 and use_rope:
+        elif dims == 3 and use_rope:
             head_dim = self.transformer[0].attn.head_dim
             rope_tensor = get_rope_tensor_3d(head_dim, self.grid_size[0], self.grid_size[1], self.grid_size[2]).unsqueeze(0)
             self.register_buffer("rope_tensor", rope_tensor, persistent=False)
@@ -358,12 +353,14 @@ class Decoder(nn.Module):
 class DeTok(nn.Module): 
     """
     l-DeTok: latent denoising makes good visual tokenizers.
-    Supports both 2D and 3D inputs with arbitrary dimensions.
+    Supports both 2D and 3D inputs with arbitrary dimss.
     """
     def __init__(
         self,
         image_size: int | tuple[int, ...] = 256,
         patch_size: int | tuple[int, ...] = 16,
+        in_channels: int = 3,
+        out_channels: int = 3,
         enc_width: int = 768,
         dec_width: int = 768,
         enc_depth: int = 12,
@@ -374,13 +371,14 @@ class DeTok(nn.Module):
         mask_ratio: float = 0.75,
         gamma: float = 3.0,
         use_additive_noise: bool = False,
-        dimension: int = 2,
+        dims: int = 2,
         # normalization parameters used for generative model training
         mean=0.0,
         std=1.0,
         scale_factor: float = 1.0,
         ckpt_path: str = None,
         use_rope: bool = True,
+        kl_weight: float = 1e-6,
     ) -> None:
         super().__init__()
 
@@ -388,50 +386,53 @@ class DeTok(nn.Module):
         self.encoder = Encoder(
             img_size=image_size,
             patch_size=patch_size,
+            in_channels=in_channels,
             width=enc_width,
             depth=enc_depth,
             num_heads=enc_num_heads,
             token_channels=token_channels,
             mask_ratio=mask_ratio,
-            dimension=dimension,
+            dims=dims,
             use_rope=use_rope,
         )
         self.decoder = Decoder(
             img_size=image_size,
             patch_size=patch_size,
+            out_channels=out_channels,
             width=dec_width,
             depth=dec_depth,
             num_heads=dec_num_heads,
             token_channels=token_channels,
-            dimension=dimension,
+            dims=dims,
             use_rope=use_rope,
         )
 
         # model configuration
-        self.dimension = dimension
+        self.dims = dims
         self.image_size = image_size
         self.patch_size = patch_size
+        self.kl_weight = kl_weight
         
         # Calculate grid sizes for tokenization
         if isinstance(image_size, int):
-            if dimension == 2:
+            if dims == 2:
                 self.img_size = (image_size, image_size)
-            elif dimension == 3:
+            elif dims == 3:
                 self.img_size = (image_size, image_size, image_size)
         else:
             self.img_size = image_size
             
         if isinstance(patch_size, int):
-            if dimension == 2:
+            if dims == 2:
                 self.patch_size_tuple = (patch_size, patch_size)
-            elif dimension == 3:
+            elif dims == 3:
                 self.patch_size_tuple = (patch_size, patch_size, patch_size)
         else:
             self.patch_size_tuple = patch_size
             
-        if dimension == 2:
+        if dims == 2:
             self.grid_size = (self.img_size[0] // self.patch_size_tuple[0], self.img_size[1] // self.patch_size_tuple[1])
-        elif dimension == 3:
+        elif dims == 3:
             self.grid_size = (self.img_size[0] // self.patch_size_tuple[0], 
                             self.img_size[1] // self.patch_size_tuple[1], 
                             self.img_size[2] // self.patch_size_tuple[2])
@@ -456,7 +457,7 @@ class DeTok(nn.Module):
         self.register_buffer("std", torch.tensor(std), persistent=False)
 
         params_M = sum(p.numel() for p in self.parameters() if p.requires_grad) / 1e6
-        logger.info(f"[DeTok] params: {params_M:.2f}M, {dimension}D, size: {self.img_size}, patch: {self.patch_size_tuple}")
+        logger.info(f"[DeTok] params: {params_M:.2f}M, {dims}D, size: {self.img_size}, patch: {self.patch_size_tuple}")
         if ckpt_path is not None:
             init_from_ckpt(self, ckpt_path)
 
@@ -532,27 +533,37 @@ class DeTok(nn.Module):
 
         return z_latents, posteriors, ids_restore
 
+    def p_loss(self, posterior, device): 
+        kl_loss = torch.zeros((), device=device)
+        if posterior is not None:
+            # assume extra_result_dict contains posteriors with kl method
+            if hasattr(posterior, "kl"):
+                kl_loss = posterior.kl()
+                kl_loss = torch.sum(kl_loss) / kl_loss.shape[0]
+        kl_loss = self.kl_weight * kl_loss
+        return kl_loss
+
     def forward(self, x: Tensor):
         """forward pass through the entire model."""
-        z_latents, result_dict, ids_restore = self.encode(x, sampling=self.training)
+        z_latents, posteriors, ids_restore = self.encode(x, sampling=self.training)
         decoded = self.decoder(z_latents, ids_restore=ids_restore)
-        return decoded, result_dict
+        return decoded, self.p_loss(posteriors, x.device)
 
     def tokenize(self, x: Tensor, sampling: bool = False) -> Tensor:
         """tokenize input image and normalize the latent tokens."""
         z = self.encode(x, sampling=sampling, mask_ratio=0.0)[0]
         z = self.normalize_z(z)
-        if self.dimension == 2:
+        if self.dims == 2:
             z = rearrange(z, "b (h w) c -> b c h w", h=self.grid_size[0], w=self.grid_size[1])
-        elif self.dimension == 3:
+        elif self.dims == 3:
             z = rearrange(z, "b (d h w) c -> b c d h w", d=self.grid_size[0], h=self.grid_size[1], w=self.grid_size[2])
         return z
 
     def detokenize(self, z: Tensor) -> Tensor:
         """detokenize latent representation back to image."""
-        if self.dimension == 2:
+        if self.dims == 2:
             z = rearrange(z, "b c h w -> b (h w) c")
-        elif self.dimension == 3:
+        elif self.dims == 3:
             z = rearrange(z, "b c d h w -> b (d h w) c")
         z = self.denormalize_z(z)
         decoded_images = self.decoder(z)
@@ -562,9 +573,9 @@ class DeTok(nn.Module):
         """sample from latent moments."""
         z = DiagonalGaussianDistribution(moments, channel_dim=-1).sample()
         z = self.normalize_z(z)
-        if self.dimension == 2:
+        if self.dims == 2:
             z = rearrange(z, "b (h w) c -> b c h w", h=self.grid_size[0], w=self.grid_size[1])
-        elif self.dimension == 3:
+        elif self.dims == 3:
             z = rearrange(z, "b (d h w) c -> b c d h w", d=self.grid_size[0], h=self.grid_size[1], w=self.grid_size[2])
         return z
 

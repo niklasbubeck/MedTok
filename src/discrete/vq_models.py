@@ -3,7 +3,7 @@ import torch
 from torch import nn
 from src.utils import init_from_ckpt
 from typing import Optional, Sequence, Union, List, Any, Dict, Tuple
-from ..modules import get_conv_layer
+from src.discrete.modules.ldm_modules import get_conv_layer
 
 __all__ = ["VQModel"]
 

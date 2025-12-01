@@ -74,16 +74,16 @@ def init_from_ckpt(self, path):
 
 class MaisiGroupNorm3D(nn.GroupNorm):
     """
-    Custom 3D Group Normalization with optional print_info output.
+    Dimension-agnostic GroupNorm that supports both 2D (N,C,H,W) and 3D (N,C,D,H,W).
 
     Args:
-        num_groups: Number of groups for the group norm.
-        num_channels: Number of channels for the group norm.
-        eps: Epsilon value for numerical stability.
-        affine: Whether to use learnable affine parameters, default to `True`.
-        norm_float16: If True, convert output of MaisiGroupNorm3D to float16 format, default to `False`.
-        print_info: Whether to print information, default to `False`.
-        save_mem: Whether to clean CUDA cache in order to save GPU memory, default to `True`.
+        num_groups: Number of groups.
+        num_channels: Number of channels.
+        eps: Epsilon for numerical stability.
+        affine: Whether to use learnable weight & bias.
+        norm_float16: Cast normalized output to fp16.
+        print_info: Verbose logging.
+        save_mem: Whether to clear CUDA cache to reduce memory.
     """
 
     def __init__(
@@ -103,54 +103,75 @@ class MaisiGroupNorm3D(nn.GroupNorm):
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
         if self.print_info:
-            logger.info(f"MaisiGroupNorm3D with input size: {input.size()}")
+            logger.info(f"MaisiGroupNorm with input size: {input.size()}")
 
-        if len(input.shape) != 5:
-            raise ValueError("Expected a 5D tensor")
+        if input.ndim not in (4, 5):
+            raise ValueError("Expected a 4D tensor (2D data) or 5D tensor (3D data).")
 
-        param_n, param_c, param_d, param_h, param_w = input.shape
-        input = input.view(param_n, self.num_groups, param_c // self.num_groups, param_d, param_h, param_w)
+        N, C, *spatial = input.shape
+        S = len(spatial)  # S = 2 (2D) or S = 3 (3D)
 
-        inputs = []
-        for i in range(input.size(1)):
-            array = input[:, i : i + 1, ...].to(dtype=torch.float32)
-            mean = array.mean([2, 3, 4, 5], keepdim=True)
-            std = array.var([2, 3, 4, 5], unbiased=False, keepdim=True).add_(self.eps).sqrt_()
+        # reshape into groups
+        input = input.view(N, self.num_groups, C // self.num_groups, *spatial)
+
+        # dimensions to compute mean/std across (all except batch/group)
+        # Example:
+        # 2D -> mean/std over [2,3,4] since shape is [N, G, Cg, H, W]
+        # 3D -> mean/std over [2,3,4,5] since shape is [N, G, Cg, D, H, W]
+        reduce_dims = list(range(2, 3 + S))
+
+        outputs = []
+        for g in range(self.num_groups):
+            arr = input[:, g:g+1, ...].to(torch.float32)
+            mean = arr.mean(reduce_dims, keepdim=True)
+            std = arr.var(reduce_dims, unbiased=False, keepdim=True).add_(self.eps).sqrt_()
+
+            norm = (arr - mean) / std
             if self.norm_float16:
-                inputs.append(((array - mean) / std).to(dtype=torch.float16))
-            else:
-                inputs.append((array - mean) / std)
+                norm = norm.to(torch.float16)
+
+            outputs.append(norm)
 
         del input
         _empty_cuda_cache(self.save_mem)
 
-        input = torch.cat(inputs, dim=1) if max(inputs[0].size()) < 500 else self._cat_inputs(inputs)
+        # large concatenation helper
+        out = (
+            torch.cat(outputs, dim=1)
+            if max(outputs[0].shape) < 500
+            else self._cat_inputs(outputs)
+        )
 
-        input = input.view(param_n, param_c, param_d, param_h, param_w)
+        # reshape back
+        out = out.view(N, C, *spatial)
+
+        # affine parameters
         if self.affine:
-            input.mul_(self.weight.view(1, param_c, 1, 1, 1)).add_(self.bias.view(1, param_c, 1, 1, 1))
+            # expand affine params to match either 4D or 5D
+            shape = [1, C] + [1] * S
+            out = out * self.weight.view(*shape) + self.bias.view(*shape)
 
         if self.print_info:
-            logger.info(f"MaisiGroupNorm3D with output size: {input.size()}")
+            logger.info(f"MaisiGroupNorm output size: {out.size()}")
 
-        return input
+        return out
 
     def _cat_inputs(self, inputs):
-        input_type = inputs[0].device.type
-        input = inputs[0].clone().to("cpu", non_blocking=True) if input_type == "cuda" else inputs[0].clone()
+        device_type = inputs[0].device.type
+        out = inputs[0].clone().cpu() if device_type == "cuda" else inputs[0].clone()
         inputs[0] = 0
         _empty_cuda_cache(self.save_mem)
 
         for k in range(len(inputs) - 1):
-            input = torch.cat((input, inputs[k + 1].cpu()), dim=1)
+            out = torch.cat((out, inputs[k + 1].cpu()), dim=1)
             inputs[k + 1] = 0
             _empty_cuda_cache(self.save_mem)
             gc.collect()
 
             if self.print_info:
-                logger.info(f"MaisiGroupNorm3D concat progress: {k + 1}/{len(inputs) - 1}.")
+                logger.info(f"MaisiGroupNorm concat progress: {k+1}/{len(inputs)-1}")
 
-        return input.to("cuda", non_blocking=True) if input_type == "cuda" else input
+        return out.to("cuda", non_blocking=True) if device_type == "cuda" else out
 
 
 class MaisiConvolution(nn.Module):
@@ -224,7 +245,7 @@ class MaisiConvolution(nn.Module):
         overlaps = [0] + [padding] * (self.num_splits - 1)
         last_padding = x.size(self.dim_split + 2) % split_size
 
-        slices = [slice(None)] * 5
+        slices = [slice(None)] * len(x.shape)
         splits: list[torch.Tensor] = []
         for i in range(self.num_splits):
             slices[self.dim_split + 2] = slice(
@@ -240,7 +261,7 @@ class MaisiConvolution(nn.Module):
         return splits
 
     def _concatenate_tensors(self, outputs: list[torch.Tensor], split_size: int, padding: int) -> torch.Tensor:
-        slices = [slice(None)] * 5
+        slices = [slice(None)] * len(outputs[0].shape)
         for i in range(self.num_splits):
             slices[self.dim_split + 2] = slice(None, split_size) if i == 0 else slice(padding, padding + split_size)
             outputs[i] = outputs[i][tuple(slices)]
@@ -270,8 +291,15 @@ class MaisiConvolution(nn.Module):
         if self.print_info:
             logger.info(f"Number of splits: {self.num_splits}")
 
+        # number of spatial dims: 2D=2, 3D=3
+        spatial_dims = x.ndim - 2
+
+        # requested split dimension must map into the spatial dimensions
+        # clamp so it works for both 2D and 3D
+        effective_dim = 2 + min(self.dim_split, spatial_dims - 1)
+
         # compute size of splits
-        l = x.size(self.dim_split + 2)
+        l = x.size(effective_dim)
         split_size = l // self.num_splits
 
         # update padding length if necessary
@@ -281,7 +309,7 @@ class MaisiConvolution(nn.Module):
         if self.print_info:
             logger.info(f"Padding size: {padding}")
 
-        # split tensor into a list of tensors
+        # split tensor into a list
         splits = self._split_tensor(x, split_size, padding)
 
         del x
@@ -290,21 +318,28 @@ class MaisiConvolution(nn.Module):
         # convolution
         outputs = [self.conv(split) for split in splits]
         if self.print_info:
-            for j in range(len(outputs)):
-                logger.info(f"Output {j + 1}/{len(outputs)} size before: {outputs[j].size()}")
+            for j, out in enumerate(outputs):
+                logger.info(f"Output {j + 1}/{len(outputs)} size before: {out.size()}")
 
         # update size of splits and padding length for output
         split_size_out = split_size
         padding_s = padding
-        non_dim_split = self.dim_split + 1 if self.dim_split < 2 else 0
-        if outputs[0].size(non_dim_split + 2) // splits[0].size(non_dim_split + 2) == 2:
+
+        # same adjustment as your original code but with general dims
+        # non_dim_split selects a different spatial dimension
+        non_dim_split = (self.dim_split + 1) if self.dim_split < (spatial_dims - 1) else 0
+        non_dim_split += 2  # shift to correct axis index
+
+
+        # detect up/downsampling effects
+        if outputs[0].size(non_dim_split) // splits[0].size(non_dim_split) == 2:
             split_size_out *= 2
             padding_s *= 2
-        elif splits[0].size(non_dim_split + 2) // outputs[0].size(non_dim_split + 2) == 2:
+        elif splits[0].size(non_dim_split) // outputs[0].size(non_dim_split) == 2:
             split_size_out //= 2
             padding_s //= 2
 
-        # concatenate list of tensors
+        # concatenate pieces back together
         x = self._concatenate_tensors(outputs, split_size_out, padding_s)
 
         del outputs
@@ -361,7 +396,7 @@ class MaisiUpsample(nn.Module):
             x_tensor: torch.Tensor = convert_to_tensor(x)
             return x_tensor
 
-        x = F.interpolate(x, scale_factor=2.0, mode="trilinear")
+        x = F.interpolate(x, scale_factor=2.0, mode="trilinear" if x.ndim == 5 else "bilinear")
         _empty_cuda_cache(self.save_mem)
         x = self.conv(x)
         _empty_cuda_cache(self.save_mem)
@@ -576,6 +611,7 @@ class MaisiEncoder(nn.Module):
         num_splits: int,
         dim_split: int,
         norm_float16: bool = False,
+        double_z: bool = True,
         print_info: bool = False,
         save_mem: bool = True,
         with_nonlocal_attn: bool = True,
@@ -594,6 +630,9 @@ class MaisiEncoder(nn.Module):
             raise ValueError("num_res_blocks and num_channels must have the same size")
 
         self.save_mem = save_mem
+
+        self.z_channels = out_channels
+        self.double_z = double_z
 
         blocks: list[nn.Module] = []
 
@@ -707,7 +746,7 @@ class MaisiEncoder(nn.Module):
             MaisiConvolution(
                 spatial_dims=spatial_dims,
                 in_channels=num_channels[-1],
-                out_channels=out_channels,
+                out_channels=out_channels * 2 if self.double_z else out_channels,
                 strides=1,
                 kernel_size=3,
                 padding=1,
@@ -766,6 +805,7 @@ class MaisiDecoder(nn.Module):
         num_splits: int,
         dim_split: int,
         norm_float16: bool = False,
+        double_z: bool = True,
         print_info: bool = False,
         save_mem: bool = True,
         with_nonlocal_attn: bool = True,
@@ -777,6 +817,7 @@ class MaisiDecoder(nn.Module):
         super().__init__()
         self.print_info = print_info
         self.save_mem = save_mem
+        self.double_z = double_z
 
         reversed_block_out_channels = list(reversed(num_channels))
 

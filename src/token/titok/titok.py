@@ -24,14 +24,14 @@ import torch
 import torch.nn as nn
 from einops import rearrange
 import torch.nn.functional as F
-from .modules import TiTokEncoder, TiTokDecoder, Pixel_Encoder, Pixel_Decoder, Pixel_Quantizer
-from src.modules import DiagonalGaussianDistribution
+from src.token.titok.modules import TiTokEncoder, TiTokDecoder, Pixel_Encoder, Pixel_Decoder, Pixel_Quantizer
+from src.modules.gaussian_dist import DiagonalGaussianDistribution
 import json
 from omegaconf import OmegaConf
 from pathlib import Path
 from src.discrete.vq_models import VQModel
 from src.discrete.quantizer.quantize import VectorQuantizer2
-from ...registry import register_model
+from src.registry import register_model
 
 __all__ = ["TiTok", "TiTok_B_64", "TiTok_L_32", "TiTok_S_128"]
 
@@ -172,7 +172,6 @@ class TiTok(nn.Module):
                 legacy=False, # fixes beta weighting error of taming
                 beta=0.25,
                 use_norm=True,
-                dims=self.dims,
                 )
         elif self.quantize_mode == "vae":
             self.quantize = DiagonalGaussianDistribution
@@ -236,7 +235,7 @@ class TiTok(nn.Module):
                 self.quantize.eval()
                 z = self.encoder(pixel_values=x, latent_tokens=self.latent_tokens)
                 z_quantized, loss, (perplexity, min_encodings, min_encoding_indices) = self.quantize(z)
-                loss = 0
+                loss = torch.tensor(0.0)
         else:
             z = self.encoder(pixel_values=x, latent_tokens=self.latent_tokens)
             if self.quantize_mode == "vq":
@@ -283,14 +282,13 @@ class TiTok(nn.Module):
     def forward(self, x):
         z_quantized, loss = self.encode(x)
         decoded = self.decode(z_quantized)
-
         return decoded, loss
 
     
 
 @register_model("token.titok.s_128")
 def TiTok_S_128(**kwargs):
-    return TiTok(hidden_size=512, depth=8, num_heads=8, num_latent_tokens=32, token_size=12, **kwargs)
+    return TiTok(hidden_size=512, depth=8, num_heads=8, num_latent_tokens=128, token_size=12, **kwargs)
 
 @register_model("token.titok.b_64")
 def TiTok_B_64(**kwargs):

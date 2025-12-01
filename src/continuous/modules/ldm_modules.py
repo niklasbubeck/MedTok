@@ -2,11 +2,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
-import torch.nn.functional as F
-from einops.layers.torch import Rearrange
-from timm.models.vision_transformer import Block
-from src.models.utils.pos_embed import get_sincos_pos_embed
-from typing import Union, Tuple, List
+
 ### GENERAL ###
 
 def get_conv_layer(dims):
@@ -526,97 +522,97 @@ class DiagonalGaussianDistribution(object):
         return self.mean
     
 
-### ViTVQ ### 
+# ### ViTVQ ### 
 
-def init_weights(m):
-    if isinstance(m, nn.Linear):
-        torch.nn.init.xavier_uniform_(m.weight)
-        if m.bias is not None:
-            nn.init.constant_(m.bias, 0)
-    elif isinstance(m, nn.LayerNorm):
-        nn.init.constant_(m.bias, 0)
-        nn.init.constant_(m.weight, 1.0)
-    elif isinstance(m, (nn.Conv2d, nn.ConvTranspose2d, nn.Conv3d, nn.ConvTranspose3d)):
-        w = m.weight.data
-        torch.nn.init.xavier_uniform_(w.view([w.shape[0], -1]))
+# def init_weights(m):
+#     if isinstance(m, nn.Linear):
+#         torch.nn.init.xavier_uniform_(m.weight)
+#         if m.bias is not None:
+#             nn.init.constant_(m.bias, 0)
+#     elif isinstance(m, nn.LayerNorm):
+#         nn.init.constant_(m.bias, 0)
+#         nn.init.constant_(m.weight, 1.0)
+#     elif isinstance(m, (nn.Conv2d, nn.ConvTranspose2d, nn.Conv3d, nn.ConvTranspose3d)):
+#         w = m.weight.data
+#         torch.nn.init.xavier_uniform_(w.view([w.shape[0], -1]))
 
-class ViTEncoder(nn.Module):
-    def __init__(self, image_size: Union[Tuple[int, ...], int], patch_size: Union[Tuple[int, ...], int],
-                 dim: int, depth: int = 12, num_heads: int = 12, mlp_ratio: int = 4, channels: int = 3, dims: int = 2, **kwargs) -> None:
-        super().__init__()
-        if isinstance(image_size, int):
-            image_size = (image_size,) * dims
-        if isinstance(patch_size, int):
-            patch_size = (patch_size,) * dims
+# class ViTEncoder(nn.Module):
+#     def __init__(self, image_size: Union[Tuple[int, ...], int], patch_size: Union[Tuple[int, ...], int],
+#                  dim: int, depth: int = 12, num_heads: int = 12, mlp_ratio: int = 4, channels: int = 3, dims: int = 2, **kwargs) -> None:
+#         super().__init__()
+#         if isinstance(image_size, int):
+#             image_size = (image_size,) * dims
+#         if isinstance(patch_size, int):
+#             patch_size = (patch_size,) * dims
 
-        assert all(i % p == 0 for i, p in zip(image_size, patch_size)), 'Input dimensions must be divisible by the patch size.'
-        pos_embedding = get_sincos_pos_embed(dim, tuple(i // p for i, p in zip(image_size, patch_size)), dims)
+#         assert all(i % p == 0 for i, p in zip(image_size, patch_size)), 'Input dimensions must be divisible by the patch size.'
+#         pos_embedding = get_sincos_pos_embed(dim, tuple(i // p for i, p in zip(image_size, patch_size)), dims)
 
-        if dims == 2:
-            self.to_patch_embedding = nn.Sequential(
-                nn.Conv2d(channels, dim, kernel_size=patch_size, stride=patch_size),
-                Rearrange('b c h w -> b (h w) c'),
-            )
-        elif dims == 3:
-            self.to_patch_embedding = nn.Sequential(
-                nn.Conv3d(channels, dim, kernel_size=patch_size, stride=patch_size),
-                Rearrange('b c d h w -> b (d h w) c'),
-            )
-        else:
-            raise ValueError("dims must be 2 or 3.")
+#         if dims == 2:
+#             self.to_patch_embedding = nn.Sequential(
+#                 nn.Conv2d(channels, dim, kernel_size=patch_size, stride=patch_size),
+#                 Rearrange('b c h w -> b (h w) c'),
+#             )
+#         elif dims == 3:
+#             self.to_patch_embedding = nn.Sequential(
+#                 nn.Conv3d(channels, dim, kernel_size=patch_size, stride=patch_size),
+#                 Rearrange('b c d h w -> b (d h w) c'),
+#             )
+#         else:
+#             raise ValueError("dims must be 2 or 3.")
 
-        self.pos_embedding = nn.Parameter(torch.from_numpy(pos_embedding).float().unsqueeze(0), requires_grad=False)
-        self.encoder_blocks = nn.ModuleList([
-            Block(dim, num_heads, mlp_ratio, qkv_bias=True, norm_layer=nn.LayerNorm,
-                  proj_drop=0.1, attn_drop=0.1) for _ in range(depth)])
+#         self.pos_embedding = nn.Parameter(torch.from_numpy(pos_embedding).float().unsqueeze(0), requires_grad=False)
+#         self.encoder_blocks = nn.ModuleList([
+#             Block(dim, num_heads, mlp_ratio, qkv_bias=True, norm_layer=nn.LayerNorm,
+#                   proj_drop=0.1, attn_drop=0.1) for _ in range(depth)])
 
-        self.apply(init_weights)
+#         self.apply(init_weights)
 
-    def forward(self, x: torch.FloatTensor) -> torch.FloatTensor:
-        x = self.to_patch_embedding(x)
-        x = x + self.pos_embedding
-        for block in self.encoder_blocks:
-            x = block(x)
-        return x
+#     def forward(self, x: torch.FloatTensor) -> torch.FloatTensor:
+#         x = self.to_patch_embedding(x)
+#         x = x + self.pos_embedding
+#         for block in self.encoder_blocks:
+#             x = block(x)
+#         return x
 
-class ViTDecoder(nn.Module):
-    def __init__(self, image_size: Union[Tuple[int, ...], int], patch_size: Union[Tuple[int, ...], int],
-                 dim: int, depth: int, num_heads: int, mlp_ratio: int, channels: int = 3, dims: int = 2, **kwargs) -> None:
-        super().__init__()
-        if isinstance(image_size, int):
-            image_size = (image_size,) * dims
-        if isinstance(patch_size, int):
-            patch_size = (patch_size,) * dims
+# class ViTDecoder(nn.Module):
+#     def __init__(self, image_size: Union[Tuple[int, ...], int], patch_size: Union[Tuple[int, ...], int],
+#                  dim: int, depth: int, num_heads: int, mlp_ratio: int, channels: int = 3, dims: int = 2, **kwargs) -> None:
+#         super().__init__()
+#         if isinstance(image_size, int):
+#             image_size = (image_size,) * dims
+#         if isinstance(patch_size, int):
+#             patch_size = (patch_size,) * dims
 
-        assert all(o % p == 0 for o, p in zip(image_size, patch_size)), 'Output dimensions must be divisible by the patch size.'
-        pos_embedding = get_sincos_pos_embed(dim, tuple(o // p for o, p in zip(image_size, patch_size)), dims)
+#         assert all(o % p == 0 for o, p in zip(image_size, patch_size)), 'Output dimensions must be divisible by the patch size.'
+#         pos_embedding = get_sincos_pos_embed(dim, tuple(o // p for o, p in zip(image_size, patch_size)), dims)
 
-        self.decoder_blocks = nn.ModuleList([
-            Block(dim, num_heads, mlp_ratio, qkv_bias=True, norm_layer=nn.LayerNorm,
-                  proj_drop=0.1, attn_drop=0.1) for _ in range(depth)])
-        self.pos_embedding = nn.Parameter(torch.from_numpy(pos_embedding).float().unsqueeze(0), requires_grad=False)
+#         self.decoder_blocks = nn.ModuleList([
+#             Block(dim, num_heads, mlp_ratio, qkv_bias=True, norm_layer=nn.LayerNorm,
+#                   proj_drop=0.1, attn_drop=0.1) for _ in range(depth)])
+#         self.pos_embedding = nn.Parameter(torch.from_numpy(pos_embedding).float().unsqueeze(0), requires_grad=False)
 
-        if dims == 2:
-            self.to_pixel = nn.Sequential(
-                Rearrange('b (h w) c -> b c h w', h=image_size[0] // patch_size[0]),
-                nn.ConvTranspose2d(dim, channels, kernel_size=patch_size, stride=patch_size)
-            )
-        elif dims == 3:
-            self.to_pixel = nn.Sequential(
-                Rearrange('b (d h w) c -> b c d h w', d=image_size[0] // patch_size[0]),
-                nn.ConvTranspose3d(dim, channels, kernel_size=patch_size, stride=patch_size)
-            )
-        else:
-            raise ValueError("dims must be 2 or 3.")
+#         if dims == 2:
+#             self.to_pixel = nn.Sequential(
+#                 Rearrange('b (h w) c -> b c h w', h=image_size[0] // patch_size[0]),
+#                 nn.ConvTranspose2d(dim, channels, kernel_size=patch_size, stride=patch_size)
+#             )
+#         elif dims == 3:
+#             self.to_pixel = nn.Sequential(
+#                 Rearrange('b (d h w) c -> b c d h w', d=image_size[0] // patch_size[0]),
+#                 nn.ConvTranspose3d(dim, channels, kernel_size=patch_size, stride=patch_size)
+#             )
+#         else:
+#             raise ValueError("dims must be 2 or 3.")
 
-        self.apply(init_weights)
+#         self.apply(init_weights)
 
-    def forward(self, token: torch.FloatTensor) -> torch.FloatTensor:
-        x = token + self.pos_embedding
-        for block in self.decoder_blocks:
-            x = block(x)
-        x = self.to_pixel(x)
-        return x
+#     def forward(self, token: torch.FloatTensor) -> torch.FloatTensor:
+#         x = token + self.pos_embedding
+#         for block in self.decoder_blocks:
+#             x = block(x)
+#         x = self.to_pixel(x)
+#         return x
 
-    def get_last_layer(self) -> nn.Parameter:
-        return self.to_pixel[-1].weight
+#     def get_last_layer(self) -> nn.Parameter:
+#         return self.to_pixel[-1].weight
