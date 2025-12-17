@@ -1,6 +1,6 @@
 """Simple demo showing how to instantiate models via the central registry."""
 
-from src import available_models, get_model, MODEL_REGISTRY
+from medtok import available_models, get_model, MODEL_REGISTRY
 from medtok.continuous import AutoencoderKL_f4
 from medtok.discrete import VQModel
 from medtok.modules import Encoder, Decoder

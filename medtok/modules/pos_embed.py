@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import Sequence, Tuple
-
+import numpy as np
 import torch
 
 
@@ -20,29 +20,60 @@ def _build_grid(size: Tuple[int, ...]) -> torch.Tensor:
     return coords
 
 
-def get_sincos_pos_embed(
-    dim: int,
-    grid_size: Sequence[int] | int,
-    dims: int = 2,
-    cls_token: bool = False,
-) -> torch.Tensor:
-    if dim % dims != 0:
-        raise ValueError(f"Embedding dimension {dim} must be divisible by {dims}.")
-    grid = _build_grid(_to_tuple(grid_size, dims))
-    per_axis = dim // dims
-    inv_freq = torch.arange(per_axis // 2, dtype=torch.float32) / (per_axis // 2)
-    inv_freq = 1.0 / (10000 ** inv_freq)
+def get_sincos_pos_embed(embed_dim, grid_size, dims):
+    """
+    grid_size: int or tuple of the grid dimensions (depth, height, width) for 3D or (height, width) for 2D
+    dims: int, 2 for 2D or 3 for 3D
+    return:
+    pos_embed: [grid_size*grid_size*grid_size, embed_dim] or [1+grid_size*grid_size*grid_size, embed_dim] (w/ or w/o cls_token)
+    """
+    if isinstance(grid_size, int):
+        grid_size = (grid_size,) * dims
+    if dims == 2:
+        return get_2d_sincos_pos_embed(embed_dim, grid_size)
+    elif dims == 3:
+        return get_3d_sincos_pos_embed(embed_dim, grid_size)
+    else:
+        raise ValueError("dims must be 2 or 3.")
 
-    embeddings = []
-    for axis in range(dims):
-        angles = torch.einsum("i,j->ij", grid[:, axis], inv_freq)
-        embeddings.append(torch.sin(angles))
-        embeddings.append(torch.cos(angles))
+def get_2d_sincos_pos_embed(embed_dim, grid_size):
+    grid_h = np.arange(grid_size[0], dtype=np.float32)
+    grid_w = np.arange(grid_size[1], dtype=np.float32)
+    grid = np.meshgrid(grid_w, grid_h)
+    grid = np.stack(grid, axis=0).reshape([2, 1, grid_size[0], grid_size[1]])
+    return get_2d_sincos_pos_embed_from_grid(embed_dim, grid)
 
-    pos_embed = torch.cat(embeddings, dim=1)
-    if cls_token:
-        pos_embed = torch.cat([torch.zeros(1, pos_embed.shape[1]), pos_embed], dim=0)
-    return pos_embed
+def get_3d_sincos_pos_embed(embed_dim, grid_size):
+    grid_d = np.arange(grid_size[0], dtype=np.float32)
+    grid_h = np.arange(grid_size[1], dtype=np.float32)
+    grid_w = np.arange(grid_size[2], dtype=np.float32)
+    grid = np.meshgrid(grid_w, grid_h, grid_d)
+    grid = np.stack(grid, axis=0).reshape([3, 1, grid_size[0], grid_size[1], grid_size[2]])
+    return get_3d_sincos_pos_embed_from_grid(embed_dim, grid)
+
+def get_2d_sincos_pos_embed_from_grid(embed_dim, grid):
+    assert embed_dim % 2 == 0
+    emb_h = get_1d_sincos_pos_embed_from_grid(embed_dim // 2, grid[0])
+    emb_w = get_1d_sincos_pos_embed_from_grid(embed_dim // 2, grid[1])
+    return np.concatenate([emb_h, emb_w], axis=1)
+
+def get_3d_sincos_pos_embed_from_grid(embed_dim, grid):
+    assert embed_dim % 3 == 0
+    emb_d = get_1d_sincos_pos_embed_from_grid(embed_dim // 3, grid[0])
+    emb_h = get_1d_sincos_pos_embed_from_grid(embed_dim // 3, grid[1])
+    emb_w = get_1d_sincos_pos_embed_from_grid(embed_dim // 3, grid[2])
+    return np.concatenate([emb_d, emb_h, emb_w], axis=1)
+
+def get_1d_sincos_pos_embed_from_grid(embed_dim, pos):
+    assert embed_dim % 2 == 0
+    omega = np.arange(embed_dim // 2, dtype=np.float32)
+    omega /= embed_dim / 2.
+    omega = 1. / 10000**omega
+    pos = pos.reshape(-1)
+    out = np.einsum('m,d->md', pos, omega)
+    emb_sin = np.sin(out)
+    emb_cos = np.cos(out)
+    return np.concatenate([emb_sin, emb_cos], axis=1)
 
 
 def _rotate_half(x: torch.Tensor) -> torch.Tensor:
