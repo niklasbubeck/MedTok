@@ -221,7 +221,8 @@ class DiT(nn.Module):
         depth=28,
         num_heads=16,
         mlp_ratio=4.0,
-        label_drop_prob=0.25,  # Increased for stronger CFG
+        class_label_drop_prob=0.1,  
+        dataset_label_drop_prob=0.05, 
         num_classes=1000,
         dataset_num=None,
         learn_sigma=True,
@@ -254,11 +255,11 @@ class DiT(nn.Module):
         self.to_pixel = ToPixel(to_pixel='none', img_size=self.img_size, out_channels=self.out_channels, 
                               in_dim=hidden_size, patch_size=self.patch_size)
         self.t_embedder = TimestepEmbedder(hidden_size)
-        self.y_embedder = LabelEmbedder(num_classes, hidden_size, label_drop_prob)
+        self.y_embedder = LabelEmbedder(num_classes, hidden_size, class_label_drop_prob)
         
         self.use_dataset_conditioning = dataset_num is not None
         if self.use_dataset_conditioning:
-            self.dataset_embedder = DatasetEmbedder(dataset_num, hidden_size, label_drop_prob)
+            self.dataset_embedder = DatasetEmbedder(dataset_num, hidden_size, dataset_label_drop_prob)
         
         num_patches = self.x_embedder.num_patches
         self.pos_embed = nn.Parameter(torch.zeros(1, num_patches, hidden_size), requires_grad=False)
@@ -325,29 +326,51 @@ class DiT(nn.Module):
         x = self.to_pixel(x)
         return x
 
-    def forward_with_cfg(self, x, t, y, cfg_scale, dataset_id=None):
-        batch_size = len(x) // 2  # Sampler already doubled x (64 -> 128)
+    def forward_with_cfg(self, x, t, y, cfg_scale, dataset_id=None, cfg_dataset=True):
+        """
+        Flexible CFG: control whether dataset_id gets CFG or stays fixed.
         
-        # Extract original batch size inputs (first half only)
-        t = t[:batch_size].expand(2 * batch_size)  # Double timesteps
-        y_cond = y[:batch_size]  # Original labels (64)
-        y_uncond = torch.full_like(y_cond, self.y_embedder.num_classes)
-        y_cfg = torch.cat([y_cond, y_uncond], dim=0)  # 128 total
+        Args:
+            cfg_dataset (bool): If True, apply CFG to both labels + dataset_id
+                            If False, apply CFG only to labels (dataset_id fixed)
+                            
+        Perfect for:
+        - cfg_dataset=True:  Full control (dataset switching)
+        - cfg_dataset=False: Fixed dataset + label control only (RetinaMNIST classes)
+        """
+        batch_size = x.shape[0]
         
+        # DOUBLE x and t
+        x_doubled = torch.cat([x, x], dim=0)
+        t_doubled = torch.cat([t, t], dim=0)
+        
+        # CLASS-LABEL CFG (always applied)
+        y_cond = y
+        y_uncond = torch.full_like(y, self.y_embedder.num_classes)
+        y_doubled = torch.cat([y_cond, y_uncond], dim=0)
+        
+        # DATASET CFG (user controlled)
         if self.use_dataset_conditioning and dataset_id is not None:
-            ds_cond = dataset_id[:batch_size]
-            ds_uncond = torch.full_like(ds_cond, self.dataset_embedder.num_datasets)
-            dataset_id_cfg = torch.cat([ds_cond, ds_uncond], dim=0)
+            if cfg_dataset:
+                # Full CFG: conditional + unconditional dataset
+                ds_cond = dataset_id
+                ds_uncond = torch.full_like(dataset_id, self.dataset_embedder.num_datasets)
+                dataset_id_doubled = torch.cat([ds_cond, ds_uncond], dim=0)
+            else:
+                # FIXED dataset: same for both passes
+                dataset_id_doubled = torch.cat([dataset_id, dataset_id], dim=0)
         else:
-            dataset_id_cfg = None
-                
-        # Forward handles learn_sigma automatically via self.out_channels
-        model_out = self.forward(x, t, y_cfg, dataset_id_cfg)  # Shape: (128, out_channels, H, W, D)
+            dataset_id_doubled = None
         
-        # Full CFG on ALL channels regardless of learn_sigma
-        cond_out, uncond_out = torch.split(model_out, batch_size, dim=0)
+        # Forward pass
+        model_out_doubled = self.forward(x_doubled, t_doubled, y_doubled, dataset_id_doubled)
+        
+        # Apply CFG
+        cond_out, uncond_out = torch.split(model_out_doubled, batch_size, dim=0)
         guided_out = uncond_out + cfg_scale * (cond_out - uncond_out)
-        return guided_out  # Shape: (128, out_channels*2 if learn_sigma else out_channels, H, W, D)
+        
+        return guided_out[:batch_size]
+
 
 
 
