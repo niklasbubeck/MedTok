@@ -163,6 +163,7 @@ class MaskGIT(nn.Module):
                  mlp_ratio=4., norm_layer=nn.LayerNorm, norm_pix_loss=False,
                  mask_ratio_min=0.05, mask_ratio_max=0.95, mask_ratio_mu=0.5, mask_ratio_std=0.25,
                  label_smoothing=0.1,
+                 dataset_label_drop_prob=0.0,
                  label_drop_prob=0.1,  # Classifier-free guidance: probability of dropping class label
                  seq_len=None,
                 ):
@@ -180,7 +181,7 @@ class MaskGIT(nn.Module):
         self.fake_class_label = vocab_size - 2
         self.mask_token_label = vocab_size - 1
         self.label_drop_prob = label_drop_prob
-
+        self.dataset_label_drop_prob = dataset_label_drop_prob
 
         self.token_emb = BertEmbeddings(vocab_size=vocab_size,
                                         hidden_size=embed_dim,
@@ -314,10 +315,10 @@ class MaskGIT(nn.Module):
 
         # Add dataset embedding to class token (position 0) if dataset conditioning is enabled
         if self.use_dataset_conditioning:
+            drop_prob = self.dataset_label_drop_prob
             if dataset_id is not None:
-                # Apply label dropout for dataset ID during training (similar to class label)
-                if self.training and self.label_drop_prob > 0:
-                    drop_mask = torch.rand(bsz, device=x.device) < self.label_drop_prob
+                if drop_prob > 0:
+                    drop_mask = torch.rand(bsz, device=x.device) < drop_prob
                     dataset_embedding = torch.where(
                         drop_mask.unsqueeze(-1),
                         self.fake_dataset_latent.expand(bsz, -1),
@@ -327,6 +328,7 @@ class MaskGIT(nn.Module):
                     dataset_embedding = self.dataset_emb(dataset_id)
             else:
                 dataset_embedding = self.fake_dataset_latent.expand(bsz, -1)
+
             # Add dataset embedding to class token position
             input_embeddings[:, 0] = input_embeddings[:, 0] + dataset_embedding
 
@@ -429,8 +431,16 @@ class MaskGIT(nn.Module):
         # Prepare dataset embedding (optional)
         dataset_embedding = None
         if self.use_dataset_conditioning:
+            drop_prob = self.dataset_label_drop_prob
             if dataset_id is not None:
                 dataset_embedding = self.dataset_emb(dataset_id.to(device))
+                if drop_prob > 0:
+                    drop_mask = torch.rand(bsz, device=device) < drop_prob
+                    dataset_embedding = torch.where(
+                        drop_mask.unsqueeze(-1),
+                        self.fake_dataset_latent.expand(bsz, -1).to(device),
+                        dataset_embedding
+                    )
             else:
                 dataset_embedding = self.fake_dataset_latent.expand(bsz, -1).to(device)
         
