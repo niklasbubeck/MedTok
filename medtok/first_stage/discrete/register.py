@@ -2,7 +2,8 @@ import torch
 import torch.nn as nn
 from medtok.registry import register_model
 from medtok.first_stage.discrete.modules.ldm_modules import Encoder, Decoder
-from medtok.first_stage.discrete.vq_models import VQModel
+from einops.layers.torch import Rearrange, Reduce
+from medtok.first_stage.discrete.vq_models import VQModel, VQModelTransformer
 from medtok.first_stage.discrete.quantizer import *
 from medtok.modules.alignments import *
 from medtok.first_stage.token.maetok.modules.vit_models import MAETokViTEncoder, MAETokViTDecoder
@@ -2121,8 +2122,87 @@ def SoftVQ_f4_d3_e8192(
     alignment = VFFoundationAlignment(latent_channels=z_channels, foundation_type="dinov2")
     return VQModel(encoder, decoder, quantizer, alignment=alignment, **kwargs)
 
+@register_model(f"continuous.wqvae.f8_d4_e16384")
+def WQVAE_f8_d4_e16384(
+    # --- encoder/decoder config ---
+        img_size=256,
+        dims=2,
+        double_z=False,
+        z_channels=4,
+        in_channels=3,
+        out_ch=3,
+        ch=128,
+        ch_mult=[1, 2, 4],
+        num_res_blocks=2,
+        attn_resolutions=[],
+        dropout=0.0,
+        # --- quantizer config ---
+        quantizer_class=WaveletResidualQuantizer,
+        num_quantizers=4,
+        n_e=16384,
+        e_dim=4,
+        beta=0.25,
+        shared_codebook=True,
+        quantize_dropout=False,
+        dropout_start_level=0,
+        wavelet="db1",
+        wavelet_levels=1,
+        subbands=["LL", "LH", "HL", "HH"],
+        **kwargs
+):
+    encoder = Encoder(
+        img_size=img_size,
+        dims=dims,
+        double_z=double_z,
+        z_channels=z_channels,
+        in_channels=in_channels,
+        out_ch=out_ch,
+        ch=ch,
+        ch_mult=ch_mult,
+        num_res_blocks=num_res_blocks,
+        attn_resolutions=attn_resolutions,
+        dropout=dropout
+    )
+    decoder = Decoder(
+        img_size=img_size,
+        dims=dims,
+        double_z=double_z,
+        z_channels=z_channels,
+        in_channels=in_channels,
+        out_ch=out_ch,
+        ch=ch,
+        ch_mult=[ch_mult[0], ch_mult[1], ch_mult[2], ch_mult[2]],
+        num_res_blocks=num_res_blocks,
+        attn_resolutions=attn_resolutions,
+        dropout=dropout
+    )
+    
+    # --- Create identical quantizer kwargs for each level ---
+    quantizer_kwargs_list = [
+        {
+            "n_e": n_e,
+            "e_dim": e_dim,
+            "beta": beta
+        }
+        for _ in range(num_quantizers)
+    ]
+    
+    quantizer = quantizer_class(
+        quantizer_class=VectorQuantizer,  # Base VQ class (your existing one)
+        num_quantizers=num_quantizers,
+        wavelet=wavelet,
+        wavelet_levels=wavelet_levels,
+        subbands=subbands,
+        quantizer_kwargs_list=quantizer_kwargs_list,
+        shared_codebook=shared_codebook,
+        quantize_dropout=quantize_dropout,
+        dropout_start_level=dropout_start_level,
+    )
+    
+    return VQModel(encoder, decoder, quantizer, **kwargs)
 
-@register_model(f"discrete.transformer.rqvae.s_16")
+
+@register_model(f"discrete.hcvq.residual_vq.S_16")
 def RQVAE_Transformer_S_16(
     img_size: int = 256,
     patch_size: int = 16,
@@ -2134,6 +2214,8 @@ def RQVAE_Transformer_S_16(
     num_heads_encoder: int = 6,
     num_heads_decoder: int = 6,
     mlp_ratio: float = 4.0,
+    mask_ratio_mu: float = 0.0,
+    masking: str = "none",
     # --- quantizer config ---
     quantizer_class=VectorQuantizer2,
     num_quantizers=4,
@@ -2158,6 +2240,8 @@ def RQVAE_Transformer_S_16(
         use_rope=True,
         num_prefix_tokens=1,
         num_latent_tokens=0,
+        mask_ratio_mu=mask_ratio_mu,
+        masking=masking,
     )
     decoder = GenericViTDecoder(
         img_size=img_size,
@@ -2172,7 +2256,7 @@ def RQVAE_Transformer_S_16(
         num_prefix_tokens=1,
         num_latent_tokens=0,
         to_pixel="conv",
-        token_dim=None,
+        token_dim=None,   # PostQuantLayer Is Done in the VQModel
     )
     quantizer = ResidualQuantizer(
         quantizer_class=quantizer_class,
@@ -2188,4 +2272,280 @@ def RQVAE_Transformer_S_16(
         quantize_dropout=quantize_dropout,
         dropout_start_level=dropout_start_level,
     )
-    return VQModel(encoder=encoder, decoder=decoder, quantizer=quantizer, pre_post_layer="linear", **kwargs)
+    return VQModelTransformer(encoder=encoder, decoder=decoder, quantizer=quantizer, pre_post_layer="linear", **kwargs)
+
+
+@register_model(f"discrete.hcvq.soft_vq.S_16")
+def SoftVQ_Transformer_S_16(
+    img_size: int = 256,
+    patch_size: int = 16,
+    in_channels: int = 3,
+    embed_dim_encoder: int = 384,
+    embed_dim_decoder: int = 384,
+    depth_encoder: int = 12,
+    depth_decoder: int = 12,
+    num_heads_encoder: int = 6,
+    num_heads_decoder: int = 6,
+    mlp_ratio: float = 4.0,
+    mask_ratio_mu: float = 0.0,
+    masking: str = "none",
+    # --- quantizer config ---
+    n_e=16384,
+    e_dim=32,
+    entropy_loss_weight=0.01,
+    entropy_loss_temperature=0.01,
+    entropy_gamma=1.0,
+    tau=0.07,
+    use_norm=True,
+    **kwargs
+    ):
+
+    encoder = GenericViTEncoder(
+        img_size=img_size,
+        patch_size=patch_size,
+        in_channels=in_channels,
+        embed_dim=embed_dim_encoder,
+        depth=depth_encoder,
+        num_heads=num_heads_encoder,
+        mlp_ratio=mlp_ratio,
+        pos_type="learned",
+        use_rope=True,
+        num_prefix_tokens=1,
+        num_latent_tokens=0,
+        mask_ratio_mu=mask_ratio_mu,
+        masking=masking,
+    )
+    decoder = GenericViTDecoder(
+        img_size=img_size,
+        patch_size=patch_size,
+        out_channels=in_channels,
+        embed_dim=embed_dim_decoder,
+        depth=depth_decoder,
+        num_heads=num_heads_decoder,
+        mlp_ratio=mlp_ratio,
+        pos_type="learned",
+        use_rope=True,
+        num_prefix_tokens=1,
+        num_latent_tokens=0,
+        to_pixel="conv",
+        token_dim=None,   # PostQuantLayer Is Done in the VQModel
+    )
+    quantizer = SoftVectorQuantizer(
+        n_e=n_e,
+        e_dim=e_dim,
+        entropy_loss_weight=entropy_loss_weight,
+        entropy_loss_temperature=entropy_loss_temperature,
+        entropy_gamma=entropy_gamma,
+        tau=tau,
+        use_norm=use_norm,
+    )
+    return VQModelTransformer(encoder=encoder, decoder=decoder, quantizer=quantizer, pre_post_layer="linear", **kwargs)
+
+
+@register_model(f"discrete.hcvq.grouped_vq.S_16")
+def GroupedVQ_Transformer_S_16(
+    img_size: int = 256,
+    patch_size: int = 16,
+    in_channels: int = 3,
+    embed_dim_encoder: int = 384,
+    embed_dim_decoder: int = 384,
+    depth_encoder: int = 12,
+    depth_decoder: int = 12,
+    num_heads_encoder: int = 6,
+    num_heads_decoder: int = 6,
+    mlp_ratio: float = 4.0,
+    mask_ratio_mu: float = 0.0,
+    masking: str = "none",
+    # --- quantizer config ---
+    quantizer_class=VectorQuantizer2,
+    n_e=16384,
+    e_dim=32,
+    beta=0.25,
+    groups=5,
+    split_dim=1,
+    **kwargs
+    ):
+
+    encoder = GenericViTEncoder(
+        img_size=img_size,
+        patch_size=patch_size,
+        in_channels=in_channels,
+        embed_dim=embed_dim_encoder,
+        depth=depth_encoder,
+        num_heads=num_heads_encoder,
+        mlp_ratio=mlp_ratio,
+        pos_type="learned",
+        use_rope=True,
+        num_prefix_tokens=1,
+        num_latent_tokens=0,
+        mask_ratio_mu=mask_ratio_mu,
+        masking=masking,
+    )
+    decoder = GenericViTDecoder(
+        img_size=img_size,
+        patch_size=patch_size,
+        out_channels=in_channels,
+        embed_dim=embed_dim_decoder,
+        depth=depth_decoder,
+        num_heads=num_heads_decoder,
+        mlp_ratio=mlp_ratio,
+        pos_type="learned",
+        use_rope=True,
+        num_prefix_tokens=1,
+        num_latent_tokens=0,
+        to_pixel="conv",
+        token_dim=None,   # PostQuantLayer Is Done in the VQModel
+    )
+    quantizer = GroupedVQ(
+        quantizer_class=quantizer_class,
+        quantizer_kwargs_list=[
+                {
+                "n_e": n_e,
+                "e_dim": e_dim,
+                "beta": beta,
+                }
+            ] * groups,
+        groups=groups,
+        split_dim=split_dim,
+    )
+    return VQModelTransformer(encoder=encoder, decoder=decoder, quantizer=quantizer, pre_post_layer="linear", **kwargs)
+
+
+@register_model(f"discrete.hcvq.sd_vq.S_16")
+def SDVQ_Transformer_S_16(
+    img_size: int = 256,
+    patch_size: int = 16,
+    in_channels: int = 3,
+    embed_dim_encoder: int = 384,
+    embed_dim_decoder: int = 384,
+    depth_encoder: int = 12,
+    depth_decoder: int = 12,
+    num_heads_encoder: int = 6,
+    num_heads_decoder: int = 6,
+    mlp_ratio: float = 4.0,
+    mask_ratio_mu: float = 0.0,
+    masking: str = "none",
+    # --- quantizer config ---
+    n_e=16384,
+    e_dim=32,
+    beta=0.25,
+    use_ema=False,
+    **kwargs
+    ):
+
+    encoder = GenericViTEncoder(
+        img_size=img_size,
+        patch_size=patch_size,
+        in_channels=in_channels,
+        embed_dim=embed_dim_encoder,
+        depth=depth_encoder,
+        num_heads=num_heads_encoder,
+        mlp_ratio=mlp_ratio,
+        pos_type="learned",
+        use_rope=True,
+        num_prefix_tokens=1,
+        num_latent_tokens=0,
+        mask_ratio_mu=mask_ratio_mu,
+        masking=masking,
+    )
+    decoder = GenericViTDecoder(
+        img_size=img_size,
+        patch_size=patch_size,
+        out_channels=in_channels,
+        embed_dim=embed_dim_decoder,
+        depth=depth_decoder,
+        num_heads=num_heads_decoder,
+        mlp_ratio=mlp_ratio,
+        pos_type="learned",
+        use_rope=True,
+        num_prefix_tokens=1,
+        num_latent_tokens=0,
+        to_pixel="conv",
+        token_dim=None,   # PostQuantLayer Is Done in the VQModel
+    )
+    quantizer = VectorQuantizer2(
+        n_e=n_e,
+        e_dim=e_dim,
+        beta=beta,
+        use_ema=use_ema,
+    )
+    return VQModelTransformer(encoder=encoder, decoder=decoder, quantizer=quantizer, pre_post_layer="linear", **kwargs)
+
+@register_model(f"discrete.hcvq.msrq.S_16")
+def MSRQ_Transformer_S_16(
+    img_size: int = 256,
+    patch_size: int = 16,
+    in_channels: int = 3,
+    embed_dim_encoder: int = 384,
+    embed_dim_decoder: int = 384,
+    depth_encoder: int = 12,
+    depth_decoder: int = 12,
+    num_heads_encoder: int = 6,
+    num_heads_decoder: int = 6,
+    mlp_ratio: float = 4.0,
+    mask_ratio_mu: float = 0.0,
+    masking: str = "none",
+    # --- quantizer config ---
+    dims=3,
+    n_e=16384,
+    e_dim=32,
+    beta=0.25,
+    use_ema=False,
+    ema_decay=0.99,
+    ema_eps=1e-5,
+    v_patch_nums=((1,1,1), (2,2,2), (3,3,3), (4,4,4), (5,5,5), (6,6,6), (8,8,8), (10, 11, 9)),
+    quant_resi=0.5,
+    share_quant_resi=4,
+    using_znorm=False,
+    **kwargs
+    ):
+
+    encoder = GenericViTEncoder(
+        img_size=img_size,
+        patch_size=patch_size,
+        in_channels=in_channels,
+        embed_dim=embed_dim_encoder,
+        depth=depth_encoder,
+        num_heads=num_heads_encoder,
+        mlp_ratio=mlp_ratio,
+        pos_type="learned",
+        use_rope=True,
+        num_prefix_tokens=1,
+        num_latent_tokens=0,
+        mask_ratio_mu=mask_ratio_mu,
+        masking=masking,
+    )
+
+
+
+    decoder = GenericViTDecoder(
+        img_size=img_size,
+        patch_size=patch_size,
+        out_channels=in_channels,
+        embed_dim=embed_dim_decoder,
+        depth=depth_decoder,
+        num_heads=num_heads_decoder,
+        mlp_ratio=mlp_ratio,
+        pos_type="learned",
+        use_rope=True,
+        num_prefix_tokens=1,
+        num_latent_tokens=0,
+        to_pixel="conv",
+        token_dim=None,   # PostQuantLayer Is Done in the VQModel
+    )
+    
+
+    quantizer = MultiScaleResidualQuantizer3D(
+        n_e=n_e,
+        e_dim=e_dim,
+        dims=dims,
+        using_znorm=using_znorm,
+        beta=beta,
+        use_ema=use_ema,
+        ema_decay=ema_decay,
+        ema_eps=ema_eps,
+        v_patch_nums=v_patch_nums,
+        quant_resi=quant_resi,
+        share_quant_resi=share_quant_resi,
+    )
+    return VQModelTransformer(encoder=encoder, decoder=decoder, quantizer=quantizer, pre_post_layer="linear", **kwargs)

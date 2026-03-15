@@ -223,7 +223,21 @@ class Encoder(nn.Module):
         self.num_resolutions = len(ch_mult)
         self.vae_stride = 2 ** (len(ch_mult) - 1)
         self.num_res_blocks = num_res_blocks
-        self.resolution = img_size
+        
+        # Handle img_size: support both int (backward compat) and tuple/list (non-cubic)
+        if isinstance(img_size, (int, float)):
+            # Backward compatibility: convert int to tuple
+            if dims == 2:
+                self.resolution = (int(img_size),) * 2
+            else:  # dims == 3
+                self.resolution = (int(img_size),) * 3
+        elif isinstance(img_size, (tuple, list)):
+            self.resolution = tuple(int(s) for s in img_size)
+            if len(self.resolution) != dims:
+                raise ValueError(f"img_size tuple length {len(self.resolution)} doesn't match dims {dims}")
+        else:
+            raise ValueError(f"img_size must be int or tuple/list, got {type(img_size)}")
+        
         self.in_channels = in_channels
         self.dims = dims
         self.ignore_mid_attn = ignore_mid_attn
@@ -236,7 +250,7 @@ class Encoder(nn.Module):
             in_channels, self.ch, kernel_size=3, stride=1, padding=1
         )
 
-        curr_res = img_size
+        curr_res = list(self.resolution)  # Track resolution as list for easy modification
         in_ch_mult = (1,) + tuple(ch_mult)
         self.down = nn.ModuleList()
         for i_level in range(self.num_resolutions):
@@ -255,14 +269,16 @@ class Encoder(nn.Module):
                     )
                 )
                 block_in = block_out
-                if curr_res in attn_resolutions:
+                # Check if any dimension matches attn_resolutions
+                if any(res in attn_resolutions for res in curr_res):
                     attn.append(AttnBlock(block_in, dims=dims))
             down = nn.Module()
             down.block = block
             down.attn = attn
             if i_level != self.num_resolutions - 1:
                 down.downsample = Downsample(block_in, resamp_with_conv, dims=dims)
-                curr_res = curr_res // 2
+                # Downsample each dimension
+                curr_res = [r // 2 for r in curr_res]
             self.down.append(down)
 
         # middle
@@ -349,7 +365,21 @@ class Decoder(nn.Module):
         self.temb_ch = 0
         self.num_resolutions = len(ch_mult)
         self.num_res_blocks = num_res_blocks
-        self.resolution = img_size
+        
+        # Handle img_size: support both int (backward compat) and tuple/list (non-cubic)
+        if isinstance(img_size, (int, float)):
+            # Backward compatibility: convert int to tuple
+            if dims == 2:
+                self.resolution = (int(img_size),) * 2
+            else:  # dims == 3
+                self.resolution = (int(img_size),) * 3
+        elif isinstance(img_size, (tuple, list)):
+            self.resolution = tuple(int(s) for s in img_size)
+            if len(self.resolution) != dims:
+                raise ValueError(f"img_size tuple length {len(self.resolution)} doesn't match dims {dims}")
+        else:
+            raise ValueError(f"img_size must be int or tuple/list, got {type(img_size)}")
+        
         self.in_channels = in_channels
         self.give_pre_end = give_pre_end
         self.dims = dims
@@ -359,13 +389,14 @@ class Decoder(nn.Module):
         # compute in_ch_mult, block_in and curr_res at lowest res
         in_ch_mult = (1,) + tuple(ch_mult)
         block_in = ch * ch_mult[self.num_resolutions - 1]
-        curr_res = img_size // 2 ** (self.num_resolutions - 1)
+        # Calculate curr_res for each dimension
+        curr_res = [r // (2 ** (self.num_resolutions - 1)) for r in self.resolution]
         
-        # Adjust z_shape based on dimensions
+        # Adjust z_shape based on dimensions (non-cubic support)
         if dims == 2:
-            self.z_shape = (1, z_channels, curr_res, curr_res)
+            self.z_shape = (1, z_channels, curr_res[0], curr_res[1])
         else:  # dims == 3
-            self.z_shape = (1, z_channels, curr_res, curr_res, curr_res)
+            self.z_shape = (1, z_channels, curr_res[0], curr_res[1], curr_res[2])
             
         print(
             "Working with z of shape {} = {} dimensions.".format(
@@ -414,14 +445,16 @@ class Decoder(nn.Module):
                     )
                 )
                 block_in = block_out
-                if curr_res in attn_resolutions:
+                # Check if any dimension matches attn_resolutions
+                if any(res in attn_resolutions for res in curr_res):
                     attn.append(AttnBlock(block_in, dims=dims))
             up = nn.Module()
             up.block = block
             up.attn = attn
             if i_level != 0:
                 up.upsample = Upsample(block_in, resamp_with_conv, dims=dims)
-                curr_res = curr_res * 2
+                # Upsample each dimension
+                curr_res = [r * 2 for r in curr_res]
             self.up.insert(0, up)  # prepend to get consistent order
 
         # end

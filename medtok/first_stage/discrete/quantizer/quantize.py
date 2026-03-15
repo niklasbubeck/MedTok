@@ -12,9 +12,9 @@ import random
 from .modules import *
 from torch.amp import autocast
 from medtok.registry import register_model
+import pytorch_wavelets as ptwt 
 
-
-__all__ = ["VectorQuantizer", "GumbelQuantize", "SimpleQINCo", "VectorQuantizer2", "SimVQ", "ResidualQuantizer", "MultiScaleResidualQuantizer", "LookupFreeQuantizer", "FiniteScalarQuantizer", "BinarySphericalQuantizer", "QINCo", "QincoResidualQuantizer", "SoftVectorQuantizer"]
+__all__ = ["VectorQuantizer", "GumbelQuantize", "SimpleQINCo", "VectorQuantizer2", "SimVQ", "ResidualQuantizer", "MultiScaleResidualQuantizer", "MultiScaleResidualQuantizer3D", "LookupFreeQuantizer", "FiniteScalarQuantizer", "BinarySphericalQuantizer", "GroupedVQ", "QINCo", "QincoResidualQuantizer", "SoftVectorQuantizer", "WaveletResidualQuantizer"]
 
 _REGISTRY_PREFIX = "discrete.quantizer."
 
@@ -240,9 +240,16 @@ class VectorQuantizer2(nn.Module):
     cosine normalization, and MaskGIT-style entropy loss.
     """
     def __init__(
-        self, n_e, e_dim, beta=0.25,
-        legacy=True, rotation_trick=False,
-        use_norm=False, use_ema=False, ema_decay=0.99, ema_eps=1e-5,
+        self, 
+        n_e, 
+        e_dim, 
+        beta=0.25,
+        legacy=True, 
+        rotation_trick=False,
+        use_norm=False, 
+        use_ema=False, 
+        ema_decay=0.99, 
+        ema_eps=1e-5,
         # ---- NEW ENTROPY OPTIONS as in MaskGITs ----
         entropy_loss_ratio=0.0,
         entropy_loss_type="softmax",   # ["softmax", "gumbel"]
@@ -833,97 +840,100 @@ class QincoResidualQuantizer(nn.Module):
 
         return final_quantized, total_loss, (all_perplexities, quantized_outputs, all_indices)
 
-# @register_model(f"{_REGISTRY_PREFIX}grouped_residual_quantizer",
-#     code_url="https://github.com/yangdongchao/AcademiCodec",
-#     paper_url="https://arxiv.org/pdf/2305.02765",
-#     description="Grouped VQ for improved efficiency original uses ResidualQuantizers!")
-# class GroupedVQ(nn.Module):
-#     """
-#     Applies a quantizer independently on channel groups.
-#     Each group gets its own quantizer instance (usually ResidualQuantizer).
-#     """
-#     def __init__(
-#         self,
-#         quantizer_class: nn.Module,
-#         in_channels: int,
-#         quantizer_kwargs_list: List[Dict],
-#         groups: int = 1,
-#         split_dim: int = 1,
-#     ):
-#         super().__init__()
-#         self.in_channels = in_channels
-#         self.groups = groups
-#         self.split_dim = split_dim
+@register_model(f"{_REGISTRY_PREFIX}grouped_residual_quantizer",
+    code_url="https://github.com/yangdongchao/AcademiCodec",
+    paper_url="https://arxiv.org/pdf/2305.02765",
+    description="Grouped VQ for improved efficiency original uses ResidualQuantizers!")
+class GroupedVQ(nn.Module):
+    """
+    Applies a quantizer independently on channel groups.
+    Each group gets its own quantizer instance (usually ResidualQuantizer).
+    """
+    def __init__(
+        self,
+        quantizer_class: nn.Module,
+        quantizer_kwargs_list: List[Dict],
+        groups: int = 4,
+        split_dim: int = 1,
+    ):
+        super().__init__()
+        self.groups = groups
+        self.split_dim = split_dim
 
-#         assert in_channels % groups == 0, \
-#             f"in_channels {in_channels} must be divisible by groups {groups}"
-#         assert len(quantizer_kwargs_list) == groups, \
-#             "One quantizer config per group required"
+        assert len(quantizer_kwargs_list) == groups, \
+            "One quantizer config per group required"
 
-#         # Build one quantizer per group (usually ResidualQuantizer)
-#         self.vqs = nn.ModuleList([
-#             quantizer_class(**quantizer_kwargs_list[i])
-#             for i in range(groups)
-#         ])
+        assert split_dim in [1, 2], \
+            "Split dimension must be either 1 for grouping for resolution or 2 for channels"
 
-#         self.dim_per_group = in_channels // groups
+        # Build one quantizer per group (usually ResidualQuantizer)
+        self.vqs = nn.ModuleList([
+            quantizer_class(**quantizer_kwargs_list[i])
+            for i in range(groups)
+        ])
 
-#     # Optional helpers
-#     @property
-#     def e_dim(self):
-#         return self.vqs[0].levels[0].e_dim
+        self.e_dim = self.vqs[0].e_dim
+        self.n_e = self.vqs[0].n_e
+    
+    # -------------------------------------------------------------------------
+    # Forward pass
+    # -------------------------------------------------------------------------
+    @autocast('cuda', enabled=False)
+    def forward(self, z: torch.Tensor):
 
-#     @property
-#     def n_e(self):
-#         return self.vqs[0].levels[0].n_e
-
-#     @property
-#     def codebooks(self):
-#         """Return codebooks from all groups (first level only)."""
-#         return torch.stack([vq.levels[0].embedding.weight for vq in self.vqs])
+        z = z.float()
+        # Put channel last (2D or 3D)
+        if z.ndim == 4:  
+            z = rearrange(z, 'b c h w -> b h w c')
+        elif z.ndim == 5: 
+            z = rearrange(z, 'b c d h w -> b d h w c')
 
 
-#     # -------------------------------------------------------------------------
-#     # Forward pass
-#     # -------------------------------------------------------------------------
-#     @autocast('cuda', enabled=False)
-#     def forward(self, x: torch.Tensor):
-#         """
-#         Returns:
-#             quantized:     (B, C, ...)
-#             total_loss:    scalar loss
-#             all_outputs:   tuple of:
-#                 - all_perplexities:  [groups][levels] or None
-#                 - all_quantized:     [groups][levels]
-#                 - all_indices:       [groups][levels][..]
-#         """
+        B, C = z.shape[0], z.shape[-1]
 
-#         # 1) Split channels into groups
-#         x_groups = x.split(self.dim_per_group, dim=self.split_dim)
+        z_flat = z.reshape(B, -1, C)
+        S = z_flat.shape[1] # sequence length
+        # 1) Split channels into groups
+        if self.split_dim == 1:
+            assert S % self.groups == 0, f"S={S} must be divisible by groups={self.groups}"
+            dim_per_group = S // self.groups
+        elif self.split_dim == 2:
+            assert C % self.groups == 0, f"C={C} must be divisible by groups={self.groups}"
+            dim_per_group = C // self.groups
+        else:
+            raise ValueError(f"Invalid split dimension: {self.split_dim}, has to be either 1 for resolution or 2 for channels")
 
-#         # 2) Apply VQ to each group independently
-#         group_results = []
-#         for group_x, vq in zip(x_groups, self.vqs):
-#             q, loss, extras = vq(group_x)
-#             group_results.append((q, loss, extras))
+        x_groups = z_flat.split(dim_per_group, dim=self.split_dim)
 
-#         # 3) Unpack results
-#         quantized_list   = [r[0] for r in group_results]
-#         losses_list      = [r[1] for r in group_results]
-#         extras_list      = [r[2] for r in group_results]
+        # 2) Apply VQ to each group independently
+        group_results = []
+        for group_x, vq in zip(x_groups, self.vqs):
+            q, loss, extras = vq(group_x)
+            group_results.append((q, loss, extras))
 
-#         # 4) Concatenate quantized outputs across groups
-#         quantized = torch.cat(quantized_list, dim=self.split_dim)
+        # 3) Unpack results
+        quantized_list   = [r[0] for r in group_results]
+        losses_list      = [r[1] for r in group_results]
+        extras_list      = [r[2] for r in group_results]
 
-#         # 5) Combine losses
-#         total_loss = sum(losses_list)
+        # 4) Concatenate quantized outputs across groups
+        quantized = torch.cat(quantized_list, dim=self.split_dim)
 
-#         # 6) Stack metadata cleanly
-#         all_perplexities  = [e[0] for e in extras_list]
-#         all_quantized_lvls = [e[1] for e in extras_list]
-#         all_indices       = [e[2] for e in extras_list]
+        # 5) Combine losses
+        total_loss = sum(losses_list)
 
-#         return quantized, total_loss, (all_perplexities, all_quantized_lvls, all_indices)
+        # 6) Stack metadata cleanly
+        all_perplexities  = [e[0] for e in extras_list]
+        all_quantized_lvls = [e[1] for e in extras_list]
+        all_indices       = [e[2] for e in extras_list]
+
+        # Restore shape (channel-first)
+        if z.ndim == 4:
+            quantized = rearrange(quantized, 'b h w c -> b c h w')
+        elif z.ndim == 5:
+            quantized = rearrange(quantized, 'b d h w c -> b c d h w')
+
+        return quantized, total_loss, (all_perplexities, all_quantized_lvls, all_indices)
 
 
 @register_model(f"{_REGISTRY_PREFIX}msrq_vector_quantizer2",
@@ -949,8 +959,19 @@ class MultiScaleResidualQuantizer(nn.Module):
         share_quant_resi: Number of quantizers to share
     """
     def __init__(
-        self, n_e: int, e_dim: int, using_znorm: bool = True, beta: float = 0.25, rotation_trick: bool = False, use_ema: bool = False, ema_decay: float = 0.99, ema_eps: float = 1e-5,
-        default_qresi_counts: int = 0, v_patch_nums: Tuple[int] = (1, 2, 3, 4, 5, 6, 8, 10, 13, 16), quant_resi: float = 0.5, share_quant_resi: int = 4,  # share_quant_resi: args.qsr
+        self, 
+        n_e: int,
+        e_dim: int,
+        using_znorm: bool = True,
+        beta: float = 0.25,
+        rotation_trick: bool = False,
+        use_ema: bool = False,
+        ema_decay: float = 0.99,
+        ema_eps: float = 1e-5,
+        default_qresi_counts: int = 0,
+        v_patch_nums: Tuple[int] = (1, 2, 3, 4, 5, 6, 8, 10, 13, 16),
+        quant_resi: float = 0.5, 
+        share_quant_resi: int = 4,  # share_quant_resi: args.qsr
     ):
         super().__init__()
         self.n_e = n_e
@@ -1145,7 +1166,354 @@ class MultiScaleResidualQuantizer(nn.Module):
                 f_hat.add_(self.quant_resi[si/(SN-1)](h_BChw))
             return f_hat, f_hat
 
+@register_model(f"{_REGISTRY_PREFIX}msrq_vector_quantizer3d",
+code_url="https://github.com/FoundationVision/VAR/blob/main/models/quant.py",
+paper_url="https://arxiv.org/pdf/2404.02905",)
+class MultiScaleResidualQuantizer3D(nn.Module):
+    """
+    Multi-Scale Residual Quantizer supporting both 2D and 3D inputs
+    As presented in VAR: Visual Autoregressive Models
+    https://arxiv.org/pdf/2404.02905
 
+    Args:
+        n_e: Number of embeddings
+        e_dim: Dimension of embedding
+        dims: Number of spatial dimensions (2 for 2D, 3 for 3D)
+        using_znorm: Whether to use z-normalization
+        beta: Commitment cost used in loss term, beta * ||z_e(x)-sg[e]||^2
+        use_ema: Whether to use EMA updates for embeddings
+        ema_decay: EMA decay rate
+        ema_eps: Epsilon value for numerical stability
+        default_qresi_counts: Number of quantizers to use
+        v_patch_nums: List of patch sizes (int for cubic patches, or tuple for non-cubic)
+        quant_resi: Quantization residual ratio
+        share_quant_resi: Number of quantizers to share
+    """
+    def __init__(
+        self, 
+        n_e: int,
+        e_dim: int,
+        dims: int = 2,
+        using_znorm: bool = True,
+        beta: float = 0.25,
+        rotation_trick: bool = False,
+        use_ema: bool = False,
+        ema_decay: float = 0.99,
+        ema_eps: float = 1e-5,
+        default_qresi_counts: int = 0,
+        v_patch_nums: Tuple[int] = (1, 2, 3, 4, 5, 6, 8, 10, 13, 16),
+        quant_resi: float = 0.5, 
+        share_quant_resi: int = 4,  # share_quant_resi: args.qsr
+    ):
+        super().__init__()
+        assert dims in [2, 3], f"dims must be 2 or 3, got {dims}"
+        self.n_e = n_e
+        self.e_dim = e_dim
+        self.dims = dims
+        self.using_znorm = using_znorm
+        self.use_ema = use_ema
+        self.rotation_trick = rotation_trick
+        self.quant_resi_ratio = quant_resi
+        
+        # Parse and normalize patch sizes once
+        self.patch_sizes = self._parse_patch_sizes(v_patch_nums)
+        self.v_patch_nums = v_patch_nums  # Keep original for compatibility
+        
+        # Set interpolation modes based on dims
+        self.interp_mode_down = 'area' if dims == 2 else 'trilinear'
+        self.interp_mode_up = 'bicubic' if dims == 2 else 'trilinear'
+        
+        # Set permute patterns based on dims
+        if dims == 2:
+            self.permute_to_channel_last = lambda x: x.permute(0, 2, 3, 1)
+            self.permute_to_channel_first = lambda x: x.permute(0, 3, 1, 2)
+        else:  # dims == 3
+            self.permute_to_channel_last = lambda x: x.permute(0, 2, 3, 4, 1)
+            self.permute_to_channel_first = lambda x: x.permute(0, 4, 1, 2, 3)
+        
+        # Create Phi or Phi3D based on dims
+        from .modules import Phi, Phi3D, PhiNonShared, PhiShared, PhiPartiallyShared
+        
+        PhiClass = Phi if dims == 2 else Phi3D
+            
+        if share_quant_resi == 0:   # non-shared: \phi_{1 to K} for K scales
+            self.quant_resi = PhiNonShared([(PhiClass(e_dim, quant_resi) if abs(quant_resi) > 1e-6 else nn.Identity()) for _ in range(default_qresi_counts or len(self.patch_sizes))])
+        elif share_quant_resi == 1: # fully shared: only a single \phi for K scales
+            self.quant_resi = PhiShared(PhiClass(e_dim, quant_resi) if abs(quant_resi) > 1e-6 else nn.Identity())
+        else:                       # partially shared: \phi_{1 to share_quant_resi} for K scales
+            self.quant_resi = PhiPartiallyShared(nn.ModuleList([(PhiClass(e_dim, quant_resi) if abs(quant_resi) > 1e-6 else nn.Identity()) for _ in range(share_quant_resi)]))
+        
+        self.register_buffer('ema_vocab_hit_SV', torch.full((len(self.patch_sizes), self.n_e), fill_value=0.0))
+        self.record_hit = 0
+        
+        self.beta = beta
+        if use_ema:
+            self.embedding = EmbeddingEMA(self.n_e, self.e_dim, decay=ema_decay, eps=ema_eps)
+        else:
+            self.embedding = nn.Embedding(self.n_e, self.e_dim)
+        
+        # only used for progressive training of VAR (not supported yet, will be tested and supported in the future)
+        self.prog_si = -1   # progressive training: not supported yet, prog_si always -1
+    
+    def _parse_patch_sizes(self, v_patch_nums):
+        """Parse patch sizes to standardized tuple format"""
+        patch_sizes = []
+        for pn in v_patch_nums:
+            if isinstance(pn, (tuple, list)):
+                if self.dims == 2:
+                    patch_sizes.append((pn[0], pn[1]) if len(pn) >= 2 else (pn[0], pn[0]))
+                else:
+                    patch_sizes.append((pn[0], pn[1], pn[2]) if len(pn) >= 3 else (pn[0], pn[0], pn[0]))
+            else:
+                patch_sizes.append((pn, pn) if self.dims == 2 else (pn, pn, pn))
+        return patch_sizes
+    
+    def eini(self, eini):
+        if eini > 0: nn.init.trunc_normal_(self.embedding.weight.data, std=eini)
+        elif eini < 0: self.embedding.weight.data.uniform_(-abs(eini) / self.n_e, abs(eini) / self.n_e)
+    
+    def extra_repr(self) -> str:
+        return f'dims={self.dims}, {self.v_patch_nums}, znorm={self.using_znorm}, beta={self.beta}  |  S={len(self.patch_sizes)}, quant_resi={self.quant_resi_ratio}'
+    
+    def _get_spatial_shape(self, tensor):
+        """Extract spatial dimensions from input tensor"""
+        if self.dims == 2:
+            return tensor.shape[2:]  # (H, W)
+        else:
+            return tensor.shape[2:]  # (D, H, W)
+    
+    def _reshape_indices(self, idx_N, B, patch_size):
+        """Reshape indices to spatial grid"""
+        if self.dims == 2:
+            return idx_N.view(B, patch_size[0], patch_size[1])
+        else:
+            return idx_N.view(B, patch_size[0], patch_size[1], patch_size[2])
+    
+    def _compute_quantization(self, f_rest, patch_size, C, si, SN):
+        """Compute quantization for a given scale"""
+        if si != SN-1:
+            rest_NC = F.interpolate(f_rest, size=patch_size, mode=self.interp_mode_down)
+            rest_NC = self.permute_to_channel_last(rest_NC).reshape(-1, C)
+        else:
+            rest_NC = self.permute_to_channel_last(f_rest).reshape(-1, C)
+        
+        if self.using_znorm:
+            rest_NC = F.normalize(rest_NC, dim=-1)
+            idx_N = torch.argmax(rest_NC @ F.normalize(self.embedding.weight.data.T, dim=0), dim=1)
+        else:
+            d_no_grad = torch.sum(rest_NC.square(), dim=1, keepdim=True) + torch.sum(self.embedding.weight.data.square(), dim=1, keepdim=False)
+            d_no_grad.addmm_(rest_NC, self.embedding.weight.data.T, alpha=-2, beta=1)
+            idx_N = torch.argmin(d_no_grad, dim=1)
+        
+        return idx_N
+    
+    def _reconstruct_from_indices(self, idx_spatial, target_size, si, SN):
+        """Reconstruct quantized features from indices"""
+        h = self.embedding(idx_spatial)
+        h = self.permute_to_channel_first(h)
+        if si != SN-1:
+            h = F.interpolate(h, size=target_size, mode=self.interp_mode_up).contiguous()
+        else:
+            h = h.contiguous()
+        return self.quant_resi[si/(SN-1)](h)
+    
+    # ===================== `forward` is only used in VAE training =====================
+    def forward(self, f_input):
+        tokenized_input = False
+        if f_input.ndim == 3: 
+            tokenized_input = True
+            if self.dims == 2:
+                f_input = rearrange(f_input, 'b (h w) c -> b c h w', h=self.patch_sizes[-1][0], w=self.patch_sizes[-1][1])
+            else:
+                f_input = rearrange(f_input, 'b (d h w) c -> b c d h w', d=self.patch_sizes[-1][0], h=self.patch_sizes[-1][1], w=self.patch_sizes[-1][2])
+        
+        dtype = f_input.dtype
+        if dtype != torch.float32: f_input = f_input.float()
+        
+        B, C = f_input.shape[:2]
+        spatial_shape = self._get_spatial_shape(f_input)
+        
+        f_no_grad = f_input.detach()
+        f_rest = f_no_grad.clone()
+        f_hat = torch.zeros_like(f_rest)
+        
+        with torch.amp.autocast('cuda', enabled=False):
+            mean_vq_loss: torch.Tensor = 0.0
+            vocab_hit_V = torch.zeros(self.n_e, dtype=torch.float, device=f_input.device)
+            SN = len(self.patch_sizes)
+            encoding_indices_list = []
+            
+            for si, patch_size in enumerate(self.patch_sizes):
+                idx_N = self._compute_quantization(f_rest, patch_size, C, si, SN)
+                
+                hit_V = idx_N.bincount(minlength=self.n_e).float()
+                encoding_indices_list.append(idx_N)
+                
+                idx_spatial = self._reshape_indices(idx_N, B, patch_size)
+                h = self._reconstruct_from_indices(idx_spatial, spatial_shape, si, SN)
+                
+                f_hat = f_hat + h
+                f_rest -= h
+                
+                if self.training:
+                    if self.record_hit == 0: self.ema_vocab_hit_SV[si].copy_(hit_V)
+                    elif self.record_hit < 100: self.ema_vocab_hit_SV[si].mul_(0.9).add_(hit_V.mul(0.1))
+                    else: self.ema_vocab_hit_SV[si].mul_(0.99).add_(hit_V.mul(0.01))
+                    self.record_hit += 1
+                vocab_hit_V.add_(hit_V)
+                mean_vq_loss += F.mse_loss(f_hat.data, f_input).mul_(self.beta) + F.mse_loss(f_hat, f_no_grad)
+            
+            mean_vq_loss *= 1. / SN
+            if self.rotation_trick:
+                f_hat = rotate_to(f_hat, f_input)
+            else:
+                f_hat = (f_hat.data - f_no_grad).add_(f_input)
+        
+        # Calculate perplexity
+        encodings = F.one_hot(encoding_indices_list[-1], self.n_e).type(f_input.dtype)
+        avg_probs = torch.mean(encodings, dim=0)
+        perplexity = torch.exp(-torch.sum(avg_probs * torch.log(avg_probs + 1e-10)))
+        
+
+        if tokenized_input:
+            if self.dims == 2:
+                f_hat = rearrange(f_hat, 'b c h w -> b (h w) c', h=self.patch_sizes[-1][0], w=self.patch_sizes[-1][1])
+            else:
+                f_hat = rearrange(f_hat, 'b c d h w -> b (d h w) c', d=self.patch_sizes[-1][0], h=self.patch_sizes[-1][1], w=self.patch_sizes[-1][2])
+        # Return in the same format as other quantizers
+        return f_hat, mean_vq_loss, (perplexity, encodings, encoding_indices_list[-1])
+    # ===================== `forward` is only used in VAE training =====================
+    
+    def embed_to_fhat(self, ms_h_BChw: List[torch.Tensor], all_to_max_scale=True, last_one=False) -> Union[List[torch.Tensor], torch.Tensor]:
+        ls_f_hat_BChw = []
+        B = ms_h_BChw[0].shape[0]
+        max_size = self.patch_sizes[-1]
+        min_size = self.patch_sizes[0]
+        SN = len(self.patch_sizes)
+        
+        if all_to_max_scale:
+            f_hat = ms_h_BChw[0].new_zeros(B, self.e_dim, *max_size, dtype=torch.float32)
+            for si, h_input in enumerate(ms_h_BChw):
+                h = h_input
+                if si < SN - 1:
+                    h = F.interpolate(h, size=max_size, mode=self.interp_mode_up)
+                h = self.quant_resi[si/(SN-1)](h)
+                f_hat.add_(h)
+                if last_one: ls_f_hat_BChw = f_hat
+                else: ls_f_hat_BChw.append(f_hat.clone())
+        else:
+            # WARNING: this is not the case in VQ-VAE training or inference (we'll interpolate every token map to the max H W, like above)
+            # WARNING: this should only be used for experimental purpose
+            f_hat = ms_h_BChw[0].new_zeros(B, self.e_dim, *min_size, dtype=torch.float32)
+            for si, (patch_size, h_input) in enumerate(zip(self.patch_sizes, ms_h_BChw)):
+                f_hat = F.interpolate(f_hat, size=patch_size, mode=self.interp_mode_up)
+                h = self.quant_resi[si/(SN-1)](h_input)
+                f_hat.add_(h)
+                if last_one: ls_f_hat_BChw = f_hat
+                else: ls_f_hat_BChw.append(f_hat)
+        
+        return ls_f_hat_BChw
+    
+    def f_to_idxBl_or_fhat(self, f_input: torch.Tensor, to_fhat: bool, v_patch_nums: Optional[Sequence[Union[int, Tuple[int, int], Tuple[int, int, int]]]] = None) -> List[Union[torch.Tensor, torch.LongTensor]]:
+        B, C = f_input.shape[:2]
+        spatial_shape = self._get_spatial_shape(f_input)
+        
+        f_no_grad = f_input.detach()
+        f_rest = f_no_grad.clone()
+        f_hat = torch.zeros_like(f_rest)
+        
+        f_hat_or_idx_Bl: List[torch.Tensor] = []
+        
+        # Use provided patch sizes or default to self.patch_sizes
+        patch_sizes = self._parse_patch_sizes(v_patch_nums) if v_patch_nums is not None else self.patch_sizes
+        
+        # Verify final patch size matches input spatial shape
+        assert patch_sizes[-1] == spatial_shape, f'{patch_sizes[-1]=} != {spatial_shape=}'
+        
+        SN = len(patch_sizes)
+        for si, patch_size in enumerate(patch_sizes):
+            if 0 <= self.prog_si < si: break    # progressive training: not supported yet, prog_si always -1
+            
+            idx_N = self._compute_quantization(f_rest, patch_size, C, si, SN)
+            idx_spatial = self._reshape_indices(idx_N, B, patch_size)
+            h = self._reconstruct_from_indices(idx_spatial, spatial_shape, si, SN)
+            
+            f_hat.add_(h)
+            f_rest.sub_(h)
+            
+            if to_fhat:
+                f_hat_or_idx_Bl.append(f_hat.clone())
+            else:
+                # Flatten indices for output
+                num_patches = 1
+                for dim in patch_size:
+                    num_patches *= dim
+                f_hat_or_idx_Bl.append(idx_N.reshape(B, num_patches))
+        
+        return f_hat_or_idx_Bl
+    
+    def idxBl_to_msrq_input(self, gt_ms_idx_Bl: List[torch.Tensor]) -> torch.Tensor:
+        """Convert indices to MSRQ input"""
+        next_scales = []
+        B = gt_ms_idx_Bl[0].shape[0]
+        C = self.e_dim
+        max_size = self.patch_sizes[-1]
+        SN = len(self.patch_sizes)
+        
+        f_hat = gt_ms_idx_Bl[0].new_zeros(B, C, *max_size, dtype=torch.float32)
+        
+        for si in range(SN-1):
+            patch_size_curr = self.patch_sizes[si]
+            patch_size_next = self.patch_sizes[si+1]
+            
+            # gt_ms_idx_Bl[si] has shape (B, num_patches) - flattened indices
+            # Get embeddings: (B, num_patches, C)
+            h_flat = self.embedding(gt_ms_idx_Bl[si])
+            # Transpose to (B, C, num_patches) and reshape to spatial
+            h = h_flat.transpose(1, 2).view(B, C, *patch_size_curr)
+            # Interpolate to max size
+            h = F.interpolate(h, size=max_size, mode=self.interp_mode_up)
+            
+            # Handle both Identity and Phi cases
+            if isinstance(self.quant_resi, nn.Identity):
+                f_hat.add_(h)
+            else:
+                f_hat.add_(self.quant_resi[si/(SN-1)](h))
+            
+            # Downsample for next scale input
+            h_down = F.interpolate(f_hat, size=patch_size_next, mode=self.interp_mode_down)
+            # Flatten and transpose: (B, C, *patch_size_next) -> (B, C, num_patches) -> (B, num_patches, C)
+            num_patches_next = 1
+            for dim in patch_size_next:
+                num_patches_next *= dim
+            h_flat_next = h_down.view(B, C, num_patches_next).transpose(1, 2)
+            next_scales.append(h_flat_next)
+        
+        return torch.cat(next_scales, dim=1) if len(next_scales) else None
+
+    def get_next_autoregressive_input(self, si: int, SN: int, f_hat: torch.Tensor, h_input: torch.Tensor) -> Tuple[Optional[torch.Tensor], torch.Tensor]:
+        """Get next autoregressive input"""
+        max_size = self.patch_sizes[-1]
+        
+        if si != SN-1:
+            next_size = self.patch_sizes[si+1]
+            
+            # Handle both Identity and Phi cases
+            h_up = F.interpolate(h_input, size=max_size, mode=self.interp_mode_up)
+            if isinstance(self.quant_resi, nn.Identity):
+                f_hat.add_(h_up)
+            else:
+                f_hat.add_(self.quant_resi[si/(SN-1)](h_up))
+            
+            f_hat_down = F.interpolate(f_hat, size=next_size, mode=self.interp_mode_down)
+            return f_hat, f_hat_down
+        else:
+            # Handle both Identity and Phi cases
+            if isinstance(self.quant_resi, nn.Identity):
+                f_hat.add_(h_input)
+            else:
+                f_hat.add_(self.quant_resi[si/(SN-1)](h_input))
+            return f_hat, f_hat
 
 @register_model(f"{_REGISTRY_PREFIX}lookup_free_quantizer",)
 class LookupFreeQuantizer(torch.nn.Module):
@@ -1614,3 +1982,141 @@ class SoftVectorQuantizer(nn.Module):
             None,
             indices
         )
+
+
+class WaveletResidualQuantizer(nn.Module):
+    def __init__(
+        self,
+        quantizer_class: nn.Module,
+        num_quantizers: int,
+        quantizer_kwargs_list: List[Dict],
+        wavelet: str = 'db1',  # <-- String name only!
+        wavelet_levels: int = 1,
+        shared_codebook: bool = False,
+        quantize_dropout: bool = False,
+        dropout_start_level: int = 0,
+        subbands: Optional[List[str]] = None,
+    ):
+        super().__init__()
+        
+        self.num_quantizers = num_quantizers
+        self.wavelet = wavelet  # Keep as string
+        self.wavelet_levels = wavelet_levels
+        self.quantize_dropout = quantize_dropout
+        self.dropout_start_level = dropout_start_level
+        self.shared_codebook = shared_codebook
+
+        # Fix: wavelet as STRING directly to DWTForward
+        self.dwt = ptwt.DWTForward(J=wavelet_levels, wave=wavelet, mode='zero')
+        self.idwt = ptwt.DWTInverse(wave=wavelet, mode='zero')  # <-- String here too!
+
+        # 4 subbands for 1-level DWT
+        if subbands is None:
+            self.subbands = ['LL', 'LH', 'HL', 'HH']
+        else:
+            self.subbands = subbands
+
+        if num_quantizers != len(self.subbands):
+            raise ValueError(f"num_quantizers {num_quantizers} must match subbands {len(self.subbands)}")
+
+        self.levels = nn.ModuleList([
+            quantizer_class(**quantizer_kwargs_list[i])
+            for i in range(num_quantizers)
+        ])
+
+        if shared_codebook:
+            first = self.levels[0]
+            shared = first.embedding
+            for q in self.levels[1:]:
+                q.embedding = shared
+
+    @property
+    def e_dim(self):
+        return self.levels[0].e_dim
+
+    @property
+    def n_e(self):
+        return self.levels[0].n_e
+
+    def _extract_subbands(self, coeffs) -> List[torch.Tensor]:
+        """Extract subbands BUT preserve pytorch_wavelets format for IDWT."""
+        Yl, Yh = coeffs  # Yl=LL tensor, Yh=(list of scales), each scale=(LH,HL,HH) tensors
+        # For J=1: Yh[0] = [LH, HL, HH] (list of 3 tensors)
+        
+        subband_list = [Yl] + list(Yh[0])  # [LL, LH, HL, HH] for quantization
+        return subband_list
+
+    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, Tuple]:
+        
+        # 1. DWT decomposition (J=1 for exactly 4 subbands)
+        coeffs = self.dwt(x)
+        Yl, Yh = coeffs
+
+        
+        # 2. Use ONLY first scale for 4 subbands (ignore deeper scales)
+        subbands = [Yl]  # LL
+        if len(Yh) > 0 and len(Yh[0]) == 3:  # LH, HL, HH from scale 0
+            subbands.extend([Yh[0][0], Yh[0][1], Yh[0][2]])
+        else:
+            # Pad with zeros matching LL shape
+            for _ in range(self.num_quantizers - 1):
+                subbands.append(torch.zeros_like(Yl))
+        
+        
+        # 3. Quantization (all subbands now same shape)
+        quantized_outputs = []
+        losses = []
+        all_indices = []
+        all_perplexities = []
+
+        dropout_level = self.num_quantizers
+        if self.training and self.quantize_dropout and self.num_quantizers > 1:
+            dropout_level = torch.randint(self.dropout_start_level, self.num_quantizers, (1,)).item()
+
+        for i, (q, sb) in enumerate(zip(self.levels, subbands)):
+            if i >= dropout_level:
+                q_out = torch.zeros_like(sb)
+                losses.append(torch.tensor(0.0, device=x.device))
+            else:
+                z_q, loss, (perplexity, _, indices) = q(sb)
+                q_out = z_q
+                losses.append(loss)
+                all_indices.append(indices)
+                all_perplexities.append(perplexity)
+            
+            quantized_outputs.append(q_out)
+        
+        final_quantized = sum(quantized_outputs)
+        
+        total_loss = sum(losses)
+        
+        return final_quantized, total_loss, (all_perplexities, quantized_outputs, all_indices)
+    
+    def get_codebook_entry(self, indices, shape=None):
+        # Identical to original RQ-VAE implementation
+        if isinstance(indices, torch.Tensor):
+            B, X = indices.shape
+            Q = self.num_quantizers
+            if X % Q != 0:
+                raise ValueError(f"Total indices {X} not divisible by num_quantizers {Q}")
+            chunk = X // Q
+            indices_list = [indices[:, i * chunk : (i + 1) * chunk] for i in range(Q)]
+        elif isinstance(indices, (list, tuple)):
+            indices_list = list(indices)
+        else:
+            raise TypeError("indices must be Tensor or list/tuple")
+
+        z_q = None
+        for q, idx in zip(self.levels, indices_list):
+            idx = idx.long()
+            if torch.all(idx < 0):
+                continue
+            z_q_i = q.get_codebook_entry(idx)
+            z_q = z_q_i if z_q is None else z_q + z_q_i
+
+        if z_q is None:
+            raise RuntimeError("All quantizer levels were dropped.")
+
+        if shape is not None:
+            z_q = z_q.view(shape)
+        return z_q

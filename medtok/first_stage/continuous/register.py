@@ -2,8 +2,9 @@ from medtok.first_stage.continuous.modules.ldm_modules import Encoder as LDMEnco
 from medtok.first_stage.continuous.modules.maisi_modules import MaisiEncoder, MaisiDecoder
 from medtok.first_stage.continuous.modules.dcae_modules.dcae_modules import DCAEEncoder, DCAEDecoder
 from medtok.registry import register_model
-from medtok.first_stage.continuous.vae_models import AutoencoderKL
+from medtok.first_stage.continuous.vae_models import AutoencoderKL, AutoencoderKLTransformer
 from medtok.modules.alignments import *
+from medtok.modules.vit_core import GenericViTEncoder, GenericViTDecoder
 
 
 @register_model(f"continuous.aekl.f4_d3", 
@@ -432,7 +433,7 @@ def DCAE_f32c32(
     decoder_act=["relu", "relu", "relu", "silu", "silu", "silu"],
     decoder_depth_list=(0, 5, 10, 2, 2, 2),
     double_z=False,
-    use_quant_conv=False,
+    pre_post_layer="none",
     project_out_conv_only=True,
     **kwargs):
     """
@@ -494,7 +495,7 @@ def DCAE_f64c128(
     decoder_act=["relu", "relu", "relu", "silu", "silu", "silu", "silu"],
     decoder_depth_list=(0, 5, 10, 2, 2, 2, 2),
     double_z=False,
-    use_quant_conv=False,
+    pre_post_layer="none",
     project_out_conv_only=True,
     **kwargs):
     """
@@ -553,7 +554,7 @@ def DCAE_f128c512(
     decoder_act=["relu", "relu", "relu", "silu", "silu", "silu", "silu", "silu"],
     decoder_depth_list=(0, 5, 10, 2, 2, 2, 2, 2),
     double_z=False,
-    use_quant_conv=False,
+    pre_post_layer="none",
     project_out_conv_only=True,
     **kwargs):
     """
@@ -590,3 +591,56 @@ def DCAE_f128c512(
         use_quant_conv=use_quant_conv,
         **kwargs,
     )
+
+
+@register_model(f"discrete.hcvq.vae.S_16")
+def SDVQ_Transformer_S_16(
+    img_size: int = 256,
+    patch_size: int = 16,
+    in_channels: int = 3,
+    embed_dim_encoder: int = 384,
+    embed_dim_decoder: int = 384,
+    depth_encoder: int = 12,
+    depth_decoder: int = 12,
+    num_heads_encoder: int = 6,
+    num_heads_decoder: int = 6,
+    mlp_ratio: float = 4.0,
+    mask_ratio_mu: float = 0.0,
+    masking: str = "none",
+    e_dim: int = 32,
+    **kwargs
+    ):
+
+    encoder = GenericViTEncoder(
+        img_size=img_size,
+        patch_size=patch_size,
+        in_channels=in_channels,
+        embed_dim=embed_dim_encoder,
+        depth=depth_encoder,
+        num_heads=num_heads_encoder,
+        mlp_ratio=mlp_ratio,
+        pos_type="learned",
+        use_rope=True,
+        num_prefix_tokens=1,
+        num_latent_tokens=0,
+        mask_ratio_mu=mask_ratio_mu,
+        masking=masking,
+        double_z=True,
+    )
+    decoder = GenericViTDecoder(
+        img_size=img_size,
+        patch_size=patch_size,
+        out_channels=in_channels,
+        embed_dim=embed_dim_decoder,
+        depth=depth_decoder,
+        num_heads=num_heads_decoder,
+        mlp_ratio=mlp_ratio,
+        pos_type="learned",
+        use_rope=True,
+        num_prefix_tokens=1,
+        num_latent_tokens=0,
+        to_pixel="conv",
+        token_dim=None,   # PostQuantLayer Is Done in the VQModel
+    )
+
+    return AutoencoderKLTransformer(encoder=encoder, decoder=decoder, pre_post_layer="linear", embed_dim=e_dim, channel_dim=2, **kwargs)

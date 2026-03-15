@@ -145,6 +145,16 @@ class Phi(nn.Conv2d):
         return h_BChw.mul(1-self.resi_ratio) + super().forward(h_BChw).mul_(self.resi_ratio)
 
 
+class Phi3D(nn.Conv3d):
+    def __init__(self, embed_dim, quant_resi):
+        ks = 3
+        super().__init__(in_channels=embed_dim, out_channels=embed_dim, kernel_size=ks, stride=1, padding=ks//2)
+        self.resi_ratio = abs(quant_resi)
+    
+    def forward(self, h_BCdhw):
+        return h_BCdhw.mul(1-self.resi_ratio) + super().forward(h_BCdhw).mul_(self.resi_ratio)
+
+
 class PhiShared(nn.Module):
     def __init__(self, qresi: Phi):
         super().__init__()

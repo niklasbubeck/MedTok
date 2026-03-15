@@ -123,7 +123,8 @@ class GenWrapper(nn.Module):
 
 
         # Automatically determine scale_factor during the first scale_steps steps
-        self._update_scale_factor(quant)
+        if self.training:
+            self._update_scale_factor(quant)
         quant = quant * self.scale_factor
 
         # ---- autoregressive path ----

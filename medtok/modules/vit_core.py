@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Optional, Tuple, Literal
 
 import torch
+from scipy import stats as scipy_stats
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
@@ -191,10 +192,18 @@ class GenericViTEncoder(nn.Module):
         proj_drop: float = 0.0,
         qkv_bias: bool = True,
         masking: MaskType = "none",
-        token_drop_min: float = 0.0,
-        token_drop_max: float = 0.0,
+        mask_ratio_mu: float = 0.0,
+        mask_ratio_std: float = 0.15,
+        mask_ratio_max: float = 0.75,
+        mask_ratio_min: float = 0.05,
+        double_z: bool = False,
     ) -> None:
         super().__init__()
+
+        self.mask_ratio_mu = mask_ratio_mu
+        self.mask_ratio_std = mask_ratio_std
+        self.mask_ratio_max = mask_ratio_max
+        self.mask_ratio_min = mask_ratio_min
 
         self.patch_embed = PatchEmbed(
             to_embed="conv",
@@ -206,6 +215,7 @@ class GenericViTEncoder(nn.Module):
         self.embed_dim = embed_dim
         # For VQModel compatibility (used as z_channels)
         self.z_channels = embed_dim
+        self.vae_stride = patch_size
         self.num_prefix_tokens = num_prefix_tokens
         self.num_latent_tokens = num_latent_tokens
         self.dims = self.patch_embed.dims
@@ -251,13 +261,16 @@ class GenericViTEncoder(nn.Module):
                 pos = torch.cat([prefix_pos, pos], dim=0)
             self.pos_embed = nn.Parameter(pos.unsqueeze(0), requires_grad=False)
         else:
-            raise ValueError(f"Unknown pos_type: {config.pos_type}")
+            raise ValueError(f"Unknown pos_type: {pos_type}")
 
         # Masking config (MAE-style)
         self.masking = masking
         if self.masking == "mae_random":
-            self.token_drop_min = float(token_drop_min)
-            self.token_drop_max = float(token_drop_max)
+            # Avoid division by zero when std is 0; use uniform [min, max] if std too small
+            std = max(self.mask_ratio_std, 1e-8)
+            a = (self.mask_ratio_min - self.mask_ratio_mu) / std
+            b = (self.mask_ratio_max - self.mask_ratio_mu) / std
+            self.mask_ratio_generator = scipy_stats.truncnorm(a, b, loc=self.mask_ratio_mu, scale=std)
             # simple mask token
             self.mask_token = nn.Parameter(torch.zeros(1, 1, self.embed_dim))
             nn.init.trunc_normal_(self.mask_token, std=0.02)
@@ -296,13 +309,15 @@ class GenericViTEncoder(nn.Module):
                 for i in range(depth)
             ]
         )
-        self.norm = nn.LayerNorm(self.embed_dim)
+        self.norm = nn.LayerNorm(self.embed_dim if not double_z else 2 * self.embed_dim)
+        self.variational_z_doubler = nn.Linear(self.embed_dim, 2 * self.embed_dim) if double_z else nn.Identity()
 
     # --- Masking ---
     def _mae_random_mask(self, x: Tensor, mask_ratio: Optional[float] = None):
         """
         x: (B, L, C) full sequence including prefix + image + latent tokens.
         We only mask *image* tokens (between prefix and before latent).
+        Returns only visible tokens for efficient processing.
         """
         bsz, seq_len, _ = x.shape
         img_start = self.num_prefix_tokens
@@ -310,36 +325,38 @@ class GenericViTEncoder(nn.Module):
         img_tokens = x[:, img_start:img_end]
 
         if mask_ratio is None:
-            mask_ratio = float(self.token_drop_max)
+            mask_ratio = float(self.mask_ratio_max)
 
         if mask_ratio <= 0.0:
             mask = torch.zeros(bsz, self.num_img_tokens, device=x.device)
-            return x, mask, None
+            return x, mask, None, None
 
         len_keep = int(self.num_img_tokens * (1.0 - mask_ratio))
 
         noise = torch.rand(bsz, self.num_img_tokens, device=x.device)
         ids_shuffle = torch.argsort(noise, dim=1)
         ids_restore = torch.argsort(ids_shuffle, dim=1)
-        ids_keep = ids_shuffle[:, :len_keep]
+        ids_keep = ids_shuffle[:, :len_keep]  # Original positions of visible tokens (in shuffled order)
 
-        kept = torch.gather(img_tokens, 1, ids_keep[..., None].repeat(1, 1, img_tokens.shape[-1]))
+        # Extract only visible tokens (not mask tokens)
+        visible_img_tokens = torch.gather(img_tokens, 1, ids_keep[..., None].repeat(1, 1, img_tokens.shape[-1]))
 
+        # Create mask for full sequence (for decoder reconstruction)
         mask = torch.ones(bsz, self.num_img_tokens, device=x.device)
         mask[:, :len_keep] = 0
         mask = torch.gather(mask, 1, ids_restore)
 
-        # Replace masked image tokens with mask_token, keep prefix & latent as is
-        if self.mask_token is None:
-            raise RuntimeError("mask_token must be defined for mae_random masking.")
-        mask_token = self.mask_token.expand(bsz, self.num_img_tokens, -1)
-        img_tokens_masked = torch.where(mask.unsqueeze(-1).bool(), mask_token, img_tokens)
-
-        x = torch.cat(
-            [x[:, :img_start], img_tokens_masked, x[:, img_end:]],
-            dim=1,
-        )
-        return x, mask, ids_restore
+        # Build sequence with only visible tokens: prefix + visible_img + latent
+        tokens_list = []
+        if self.num_prefix_tokens > 0:
+            tokens_list.append(x[:, :img_start])  # prefix tokens
+        tokens_list.append(visible_img_tokens)  # only visible image tokens
+        if self.num_latent_tokens > 0:
+            tokens_list.append(x[:, img_end:])  # latent tokens
+        
+        x_visible = torch.cat(tokens_list, dim=1) if len(tokens_list) > 1 else tokens_list[0]
+        
+        return x_visible, mask, ids_restore, ids_keep
 
     def forward(self, x: Tensor, mask_ratio: Optional[float] = None):
         """
@@ -371,28 +388,52 @@ class GenericViTEncoder(nn.Module):
         # masking (on image tokens only)
         mask = None
         ids_restore = None
+        ids_keep = None
+        num_visible_tokens = None
         if self.masking == "mae_random":
-            seq, mask, ids_restore = self._mae_random_mask(seq, mask_ratio=mask_ratio)
+            mask_ratio = self.mask_ratio_generator.rvs(1)[0] if mask_ratio is None else mask_ratio
+            print(f"mask_ratio: {mask_ratio}")
+            seq, mask, ids_restore, ids_keep = self._mae_random_mask(seq, mask_ratio=mask_ratio)
+            # After masking, seq contains only visible tokens
+            # Calculate number of visible image tokens
+            num_visible_tokens = ids_keep.shape[1] if ids_keep is not None else int(self.num_img_tokens * (1.0 - (mask_ratio if mask_ratio is not None else self.mask_ratio_max)))
 
         # RoPE tensor (for image tokens only)
         rope_tensor = None
         img_token_start = self.num_prefix_tokens
-        img_token_end = self.num_prefix_tokens + self.num_img_tokens
+        # When masking, img_token_end is adjusted to only visible tokens
+        if num_visible_tokens is not None:
+            img_token_end = self.num_prefix_tokens + num_visible_tokens
+        else:
+            img_token_end = self.num_prefix_tokens + self.num_img_tokens
 
         if self.use_rope and self.rope_tensor is not None:
-            # For now, assume fixed grid; if dynamic resizing needed, can mirror DeTok logic.
-            rope_tensor = self.rope_tensor.to(seq.device, dtype=seq.dtype)
+            rope_tensor_full = self.rope_tensor.to(seq.device, dtype=seq.dtype)
+            if num_visible_tokens is not None and ids_keep is not None:
+                # Extract RoPE for visible tokens: ids_keep contains original positions of visible tokens
+                # Use first batch's ids_keep to extract RoPE (same for all batches)
+                rope_tensor = rope_tensor_full[ids_keep[0]]
+            else:
+                rope_tensor = rope_tensor_full
 
         for blk in self.blocks:
             seq = blk(seq, rope_tensor=rope_tensor, img_token_start=img_token_start, img_token_end=img_token_end)
 
+        seq = self.variational_z_doubler(seq)
+            
         seq = self.norm(seq)
 
-        # If latent tokens are present, by default return only them (B, num_latent_tokens, C)
+        # Extract tokens for output: exclude prefix tokens (CLS) from latent space
+        # When masking, return only visible tokens; otherwise return all image tokens
+        img_start = self.num_prefix_tokens
+        
         if self.num_latent_tokens > 0:
+            # Return only latent tokens (B, num_latent_tokens, C)
             tokens_out = seq[:, -self.num_latent_tokens:]
         else:
-            tokens_out = seq
+            # Return only visible image tokens (when masking) or all image tokens (when not masking)
+            # Exclude prefix tokens
+            tokens_out = seq[:, img_start:img_token_end]
 
         aux = {"mask": mask, "ids_restore": ids_restore}
         return tokens_out, aux
@@ -445,6 +486,13 @@ class GenericViTDecoder(nn.Module):
         self.num_prefix_tokens = num_prefix_tokens
         self.num_latent_tokens = num_latent_tokens
 
+        # Prefix tokens (independent from encoder)
+        if self.num_prefix_tokens > 0:
+            self.prefix_tokens = nn.Parameter(torch.zeros(1, self.num_prefix_tokens, self.embed_dim))
+            nn.init.trunc_normal_(self.prefix_tokens, std=0.02)
+        else:
+            self.prefix_tokens = None
+
         # mask token for MAE-style reconstruction
         self.mask_token = nn.Parameter(torch.zeros(1, 1, self.embed_dim))
         nn.init.trunc_normal_(self.mask_token, std=0.02)
@@ -467,7 +515,7 @@ class GenericViTDecoder(nn.Module):
                 pos = torch.cat([prefix_pos, pos], dim=0)
             self.pos_embed = nn.Parameter(pos.unsqueeze(0), requires_grad=False)
         else:
-            raise ValueError(f"Unknown pos_type: {config.pos_type}")
+            raise ValueError(f"Unknown pos_type: {pos_type}")
 
         # RoPE buffers
         self.use_rope = use_rope
@@ -510,6 +558,10 @@ class GenericViTDecoder(nn.Module):
         )
         self.norm = nn.LayerNorm(self.embed_dim)
 
+    def get_last_layer(self):
+        """Return the last layer weights for adaptive GAN loss weighting."""
+        return self.to_pixel.get_last_layer()
+
     def forward(self, tokens: Tensor, ids_restore: Optional[Tensor] = None) -> Tensor:
         """
         tokens: (B, L, C_token) latent tokens or visible tokens.
@@ -528,8 +580,13 @@ class GenericViTDecoder(nn.Module):
             x_ = torch.cat([x, mask_tokens], dim=1)  # (B, L + num_mask_tokens, C)
             x = torch.gather(x_, 1, ids_restore.unsqueeze(-1).expand(-1, -1, x_.shape[-1]))
 
-        # Add absolute pos on prefix+image tokens (no latent tokens here)
+        # Prepend decoder's own prefix tokens (independent from encoder)
         seq = x
+        if self.prefix_tokens is not None:
+            prefix = self.prefix_tokens.expand(B, -1, -1)
+            seq = torch.cat([prefix, seq], dim=1)  # (B, num_prefix_tokens + L, C)
+
+        # Add absolute pos on prefix+image tokens
         if self.pos_embed is not None:
             seq = seq + self.pos_embed
 
