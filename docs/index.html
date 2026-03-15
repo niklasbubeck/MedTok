@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MedTok: The Anatomy of Medical Image Tokenization</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css">
+  <style>
+    :root {
+      --bg: #0f1419;
+      --surface: #1a2332;
+      --text: #e6edf3;
+      --primary: #58a6ff;
+      --accent: #7ee787;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+    h1 { font-size: 1.8rem; margin-bottom: 0.5rem; }
+    .subtitle { color: #8b949e; font-size: 1rem; margin-bottom: 2rem; }
+    .badge { display: inline-block; background: var(--primary); color: #fff; padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.85rem; margin-right: 0.5rem; }
+    .links { margin: 1.5rem 0; }
+    .links a { color: var(--primary); text-decoration: none; margin-right: 1rem; }
+    .links a:hover { text-decoration: underline; }
+    section { margin: 2rem 0; }
+    section h2 { font-size: 1.2rem; color: var(--accent); margin-bottom: 0.8rem; }
+    .abstract { background: var(--surface); padding: 1.2rem; border-radius: 8px; font-size: 0.95rem; }
+    ul { padding-left: 1.2rem; }
+    .findings { display: grid; gap: 0.8rem; }
+    .finding { background: var(--surface); padding: 1rem; border-radius: 6px; border-left: 3px solid var(--primary); }
+    footer { margin-top: 3rem; font-size: 0.85rem; color: #8b949e; }
+  </style>
+</head>
+<body>
+  <h1>MedTok</h1>
+  <p class="subtitle">The Anatomy of Medical Image Tokenization</p>
+  <span class="badge">Benchmark</span>
+  <span class="badge">Medical Imaging</span>
+  <span class="badge">NeurIPS 2025 Datasets & Benchmarks</span>
+
+  <div class="links">
+    <a href="https://github.com/niklasbubeck/MedTok">Code</a>
+    <a href="#">Paper (arXiv)</a>
+    <a href="https://medmnist.com/">MedMNIST</a>
+  </div>
+
+  <section>
+    <h2>Abstract</h2>
+    <div class="abstract">
+      Medical image generation and analysis increasingly rely on tokenization—mapping images to compact latent representations. Recent work on natural images has revealed fundamental tensions: reconstruction FID (rFID) is often poorly correlated with generation FID (gFID); increasing latent dimension improves reconstruction but hurts generation; alignment strategies yield mixed results. Yet all such findings stem from ImageNet-scale natural imagery. The design space of tokenizers for <em>medical</em> imaging remains underexplored, with no systematic benchmark to guide practitioners. We present <strong>MedTok</strong>, a comprehensive benchmark evaluating 15+ tokenizers across 12 MedMNIST datasets, spanning continuous VAEs, discrete quantizers, and alignment strategies. Our key findings: (1) In medical imaging, rFID correlates strongly with gFID (Pearson r ≈ 0.79); (2) RQVAE, SimQinco, and SimVQ dominate discrete tokenizers; (3) alignment improves reconstruction but degrades generation; (4) larger latent dimensions hurt generation.
+    </div>
+  </section>
+
+  <section>
+    <h2>Key Findings</h2>
+    <div class="findings">
+      <div class="finding"><strong>rFID predicts generation.</strong> Unlike natural images, rFID correlates strongly with gFID (r ≈ 0.79) in medical imaging.</div>
+      <div class="finding"><strong>RQVAE, SimQinco, SimVQ</strong> lead discrete tokenizers in reconstruction and compression efficiency.</div>
+      <div class="finding"><strong>Alignment</strong> (MedVAE, VAVAE) improves reconstruction but neither improves generation; VAEKL remains a strong baseline.</div>
+      <div class="finding"><strong>Larger latent dimensions</strong> degrade generation; use moderate d (5–15) for generation-oriented pipelines.</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Getting Started</h2>
+    <pre style="background: var(--surface); padding: 1rem; border-radius: 6px; overflow-x: auto;"><code>pip install medtok
+# See README for full usage</code></pre>
+  </section>
+
+  <footer>
+    MedTok — First comprehensive benchmark for medical image tokenization. NeurIPS 2025 Datasets & Benchmarks Track.
+  </footer>
+</body>
+</html>
