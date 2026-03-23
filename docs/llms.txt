@@ -1,6 +1,9 @@
-# MedLat (MedTok workspace)
+# MedLat
 
-> Unified PyTorch library for first-stage models (tokenizers, continuous/discrete autoencoders, quantizers) and second-stage generators (autoregressive MaskGIT/MAR, diffusion DiT/LDM/ADM). Single string-key model registry: `get_model`, `available_models`, `get_model_info`.
+> Name: **medical** (imaging + rigour) + **mad lad** (slang for bold, memorable energy). Unified PyTorch library for first-stage models (tokenizers, continuous/discrete autoencoders, quantizers) and second-stage generators (autoregressive MaskGIT/MAR, diffusion DiT/LDM/ADM). Single string-key model registry: `get_model`, `available_models`, `get_model_info`. **2D CV and 3D medical volumes:** same registry; use `dims=2` vs `dims=3` (and consistent spatial config) on model builders.
+
+## Spatial dimensionality (2D vs 3D)
+- Registered models support **2D computer vision** and **3D volumetric medical imaging** (e.g. CT/MRI-style volumes) through the same IDs; set `dims=2` or `dims=3` and consistent `img_size` / spatial layout when calling `get_model`.
 
 ## Primary sources
 - Repository: https://github.com/niklasbubeck/MedLat
@@ -17,6 +20,9 @@
 
 ## Integration
 - Glue module: `medlat.modules.wrapper.GenWrapper` pairs generator + first stage; respects discrete/continuous and autoregressive/non-autoregressive routes.
+
+## Citation
+BibTeX key `bubeck_medlat_2025` — see README.md **Citation** section or project page `#citation`. Default: Bubeck, N. (2025). *MedLat* v0.1.0. https://github.com/niklasbubeck/MedLat
 
 ## License
 MIT — see repository pyproject.toml

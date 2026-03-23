@@ -2,6 +2,10 @@
 
 **MedLat** (`medlat`) is a PyTorch library for **first-stage models** (tokenizers, continuous and discrete autoencoders, quantizers) and **second-stage generators** (autoregressive and diffusion-based), aimed at medical imaging and general visual data. Everything is exposed through a single **model registry**: instantiate by string ID, list IDs programmatically, and optionally read paper/code links via `get_model_info`.
 
+**2D and 3D:** Registered models are built to cover **standard 2D computer vision** (natural images, 2D slices, projections) **and 3D medical volumetric data** (e.g. CT/MRI-style volumes). The same registry IDs apply; switch spatial dimensionality with constructor arguments such as **`dims=2`** vs **`dims=3`** (and matching `img_size` / spatial layout) on the builders you instantiate—so one codebase serves both pipelines.
+
+**Project page (SEO, FAQ, llms.txt):** open [`docs/index.html`](docs/index.html) locally, or publish the [`docs/`](docs/) folder to GitHub Pages (see `docs/sitemap.xml` / `docs/robots.txt`).
+
 ---
 
 ## What this repo contains
@@ -40,7 +44,7 @@ print(list(available_models()))
 from medlat import get_model_info
 print(get_model_info("continuous.aekl.f8_d16"))
 
-# First stage: tokenizer or VAE
+# First stage: tokenizer or VAE (dims=2 for 2D CV, dims=3 for volumetric 3D medical data)
 tokenizer = get_model("token.titok.s_128", img_size=128, dims=2)
 # Other examples: continuous.aekl.f8_d16, discrete.vq.f8_d8_e16384, token.vmae.s_p8_d16, ...
 
@@ -206,6 +210,28 @@ token_ids = list(available_models("token."))
 vq_ids = list(available_models("discrete.vq."))
 dit_ids = list(available_models("dit."))
 ```
+
+---
+
+## Citation
+
+If you use MedLat in research or a publication, please cite the software. Version and author metadata also appear in [`pyproject.toml`](pyproject.toml).
+
+**BibTeX:**
+
+```bibtex
+@software{bubeck_medlat_2025,
+  author = {Bubeck, Niklas},
+  title = {{MedLat}: {PyTorch} library for first-stage models and latent generators},
+  url = {https://github.com/niklasbubeck/MedLat},
+  version = {0.1.0},
+  year = {2025},
+}
+```
+
+**Plain text (APA-style):**
+
+> Bubeck, N. (2025). *MedLat* (Version 0.1.0) [Computer software]. https://github.com/niklasbubeck/MedLat
 
 ---
 

@@ -6,15 +6,15 @@
   <meta http-equiv="x-ua-compatible" content="IE=edge" />
 
   <!-- Primary SEO -->
-  <title>MedLat — Medical imaging tokenizers, VAEs &amp; latent generators (PyTorch)</title>
-  <meta name="title" content="MedLat — Medical imaging tokenizers, VAEs &amp; latent generators (PyTorch)" />
-  <meta name="description" content="MedLat (medlat) is a PyTorch library with a unified model registry for first-stage models—tokenizers, continuous and discrete autoencoders, quantizers—and generators including MaskGIT, MAR, DiT, LDM, and ADM. Built for medical imaging and visual data." />
-  <meta name="keywords" content="MedLat, MedTok, medical imaging, PyTorch, tokenizer, VAE, VQ-VAE, latent diffusion, DiT, MaskGIT, MAR, MONAI, model registry, generative AI, discrete codes, continuous autoencoder" />
+  <title>MedLat — Medical depth, mad-lad code · PyTorch model registry</title>
+  <meta name="title" content="MedLat — Medical depth, mad-lad code · PyTorch model registry" />
+  <meta name="description" content="MedLat (medlat): one PyTorch model registry for 2D computer vision and 3D volumetric medical data—tokenizers, VAEs, VQ, generators (MaskGIT, MAR, DiT, LDM, ADM). Use dims=2 or dims=3 on builders." />
+  <meta name="keywords" content="MedLat, medlat, 2D computer vision, 3D medical imaging, volumetric CT MRI, mad lad, PyTorch, tokenizer, VAE, VQ-VAE, latent diffusion, DiT, MaskGIT, MAR, MONAI, model registry, generative AI" />
   <meta name="author" content="Niklas Bubeck" />
   <meta name="robots" content="index, follow, max-image-preview:large" />
   <meta name="googlebot" content="index, follow" />
   <meta name="bingbot" content="index, follow" />
-  <meta name="theme-color" content="#050810" />
+  <meta name="theme-color" content="#0a0612" />
   <meta name="color-scheme" content="dark" />
   <meta name="generator" content="hand-authored" />
 
@@ -25,47 +25,51 @@
   <!-- Open Graph -->
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="MedLat" />
-  <meta property="og:title" content="MedLat — Tokenizers, VAEs &amp; generators for medical imaging" />
-  <meta property="og:description" content="Unified PyTorch model registry: first-stage tokenizers &amp; VAEs, discrete quantizers, and diffusion/autoregressive generators." />
+  <meta property="og:title" content="MedLat — Medical depth, mad-lad code" />
+  <meta property="og:description" content="Same registry for 2D CV and 3D medical volumes—tokenizers, VAEs, VQ, diffusion &amp; autoregressive generators. Med + Lat: clinical depth, bold code." />
   <meta property="og:url" content="https://niklasbubeck.github.io/MedLat/" />
   <meta property="og:locale" content="en_US" />
   <meta property="og:image" content="https://niklasbubeck.github.io/MedLat/assets/og-cover.svg" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
-  <meta property="og:image:alt" content="MedLat — first-stage models and generators for medical imaging" />
+  <meta property="og:image:alt" content="MedLat — Med plus Lat, medical rigour and mad-lad energy" />
 
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="MedLat — Medical imaging tokenizers &amp; latent generators" />
-  <meta name="twitter:description" content="PyTorch library with a single model registry: VAE/VQ/tokenizers + MaskGIT, MAR, DiT, LDM, ADM." />
+  <meta name="twitter:title" content="MedLat — Medical depth, mad-lad code" />
+  <meta name="twitter:description" content="MedLat: 2D vision + 3D medical volumes in one registry. VAE, VQ, tokenizers, MaskGIT, MAR, DiT, LDM, ADM—dims=2 or dims=3." />
   <meta name="twitter:image" content="https://niklasbubeck.github.io/MedLat/assets/og-cover.svg" />
 
   <!-- AI / agent hints -->
-  <meta name="summary" content="MedLat: PyTorch package medlat with register_model/get_model for hundreds of tokenizer and generator configs; see llms.txt and README." />
+  <meta name="summary" content="MedLat: 2D CV + 3D medical data, one registry (dims=2/dims=3). PyTorch medlat—get_model, llms.txt, README." />
   <link rel="help" href="https://github.com/niklasbubeck/MedLat/blob/main/README.md" />
   <link rel="alternate" href="/llms.txt" type="text/plain" title="LLM / agent summary" />
 
   <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,700;12..96,800&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;700;800&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
   <style>
     :root {
-      --bg-deep: #050810;
-      --bg-card: rgba(12, 20, 38, 0.72);
-      --bg-card-solid: #0c1426;
-      --stroke: rgba(120, 160, 220, 0.18);
-      --text: #e8edf7;
-      --muted: #8b9ab8;
-      --accent: #2ee6c7;
-      --accent-2: #5b8cff;
-      --warn: #ffc46b;
-      --radius: 18px;
-      --font-display: "Bricolage Grotesque", system-ui, sans-serif;
-      --font-body: "Literata", Georgia, serif;
+      --bg-deep: #0a0612;
+      --bg-card: rgba(22, 14, 42, 0.78);
+      --bg-card-solid: #140f22;
+      --stroke: rgba(255, 120, 180, 0.14);
+      --text: #f2eef9;
+      --muted: #a89bc4;
+      --med: #3ee6d6;
+      --med-dim: #2bc4b8;
+      --lad: #ff5e9a;
+      --lad-warm: #ffb84d;
+      --accent: var(--med);
+      --accent-2: #7c9cff;
+      --warn: #ffb84d;
+      --radius: 20px;
+      --font-display: "Unbounded", system-ui, sans-serif;
+      --font-body: "Outfit", system-ui, sans-serif;
       --font-mono: ui-monospace, "Cascadia Code", "Source Code Pro", monospace;
-      --shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+      --shadow: 0 28px 90px rgba(0, 0, 0, 0.55);
     }
 
     *, *::before, *::after { box-sizing: border-box; }
@@ -75,6 +79,7 @@
       font-family: var(--font-body);
       font-size: 1.05rem;
       line-height: 1.65;
+      font-weight: 400;
       color: var(--text);
       background: var(--bg-deep);
       min-height: 100vh;
@@ -85,63 +90,71 @@
       left: -9999px;
       z-index: 9999;
       padding: 0.75rem 1.25rem;
-      background: var(--accent);
-      color: #031;
+      background: var(--lad);
+      color: #1a0610;
       font-weight: 700;
       border-radius: 8px;
     }
     .skip-link:focus { left: 1rem; top: 1rem; }
 
-    /* Ambient background */
     .bg-mesh {
       position: fixed;
       inset: 0;
       z-index: -2;
       background:
-        radial-gradient(ellipse 80% 50% at 20% -10%, rgba(46, 230, 199, 0.12), transparent 50%),
-        radial-gradient(ellipse 60% 40% at 90% 20%, rgba(91, 140, 255, 0.1), transparent 45%),
-        radial-gradient(ellipse 50% 35% at 50% 100%, rgba(30, 60, 120, 0.25), transparent 50%),
+        radial-gradient(ellipse 70% 55% at 15% 0%, rgba(62, 230, 214, 0.14), transparent 55%),
+        radial-gradient(ellipse 55% 45% at 92% 8%, rgba(255, 94, 154, 0.11), transparent 50%),
+        radial-gradient(ellipse 50% 40% at 50% 100%, rgba(124, 156, 255, 0.12), transparent 55%),
         var(--bg-deep);
     }
     .bg-grid {
       position: fixed;
       inset: 0;
       z-index: -1;
-      opacity: 0.04;
+      opacity: 0.055;
+      transform: skewY(-2deg) scale(1.05);
       background-image:
-        linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px);
-      background-size: 48px 48px;
+        linear-gradient(rgba(255,255,255,0.07) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.07) 1px, transparent 1px);
+      background-size: 52px 52px;
       pointer-events: none;
+    }
+    .bg-noise {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      opacity: 0.035;
+      pointer-events: none;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
     }
 
     header.site {
-      padding: 1.25rem clamp(1rem, 4vw, 3rem);
+      padding: 1.1rem clamp(1rem, 4vw, 3rem);
       display: flex;
       flex-wrap: wrap;
       align-items: center;
       justify-content: space-between;
       gap: 1rem;
       border-bottom: 1px solid var(--stroke);
-      backdrop-filter: blur(12px);
+      backdrop-filter: blur(14px);
       position: sticky;
       top: 0;
       z-index: 10;
-      background: rgba(5, 8, 16, 0.85);
+      background: rgba(10, 6, 18, 0.88);
     }
     .brand {
       font-family: var(--font-display);
       font-weight: 800;
-      font-size: 1.35rem;
-      letter-spacing: -0.03em;
-      color: var(--text);
+      font-size: 1.4rem;
+      letter-spacing: -0.04em;
       text-decoration: none;
       display: flex;
-      align-items: center;
-      gap: 0.5rem;
+      align-items: baseline;
+      gap: 0;
     }
-    .brand span.hl {
-      background: linear-gradient(120deg, var(--accent), var(--accent-2));
+    .brand-med { color: var(--med); }
+    .brand-lad {
+      background: linear-gradient(105deg, var(--lad) 0%, var(--lad-warm) 100%);
       -webkit-background-clip: text;
       background-clip: text;
       color: transparent;
@@ -149,30 +162,30 @@
     nav.site-nav {
       display: flex;
       flex-wrap: wrap;
-      gap: 0.35rem 1rem;
-      font-family: var(--font-display);
-      font-size: 0.9rem;
+      gap: 0.35rem 0.85rem;
+      font-family: var(--font-body);
+      font-size: 0.88rem;
       font-weight: 600;
     }
     nav.site-nav a {
       color: var(--muted);
       text-decoration: none;
-      padding: 0.35rem 0.5rem;
+      padding: 0.4rem 0.55rem;
       border-radius: 8px;
       transition: color 0.2s, background 0.2s;
     }
     nav.site-nav a:hover, nav.site-nav a:focus-visible {
-      color: var(--accent);
-      background: rgba(46, 230, 199, 0.08);
+      color: var(--lad-warm);
+      background: rgba(255, 94, 154, 0.08);
     }
     .btn {
       display: inline-flex;
       align-items: center;
       gap: 0.5rem;
-      font-family: var(--font-display);
+      font-family: var(--font-body);
       font-weight: 700;
       font-size: 0.92rem;
-      padding: 0.65rem 1.15rem;
+      padding: 0.65rem 1.2rem;
       border-radius: 999px;
       border: none;
       cursor: pointer;
@@ -180,40 +193,78 @@
       transition: transform 0.15s, box-shadow 0.2s;
     }
     .btn-primary {
-      background: linear-gradient(135deg, var(--accent), #1bc4a8);
-      color: #021a16;
-      box-shadow: 0 8px 32px rgba(46, 230, 199, 0.25);
+      background: linear-gradient(125deg, var(--lad) 0%, #ff8a8a 45%, var(--lad-warm) 100%);
+      color: #1a0610;
+      box-shadow: 0 10px 36px rgba(255, 94, 154, 0.35);
     }
-    .btn-primary:hover { transform: translateY(-1px); }
+    .btn-primary:hover { transform: translateY(-2px) rotate(-0.5deg); }
+    .btn-secondary {
+      background: linear-gradient(135deg, var(--med), var(--med-dim));
+      color: #031;
+      box-shadow: 0 8px 28px rgba(62, 230, 214, 0.22);
+    }
+    .btn-secondary:hover { transform: translateY(-1px); }
     .btn-ghost {
       background: transparent;
       color: var(--text);
       border: 1px solid var(--stroke);
     }
-    .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-ghost:hover { border-color: var(--med); color: var(--med); }
 
     main { padding-bottom: 4rem; }
 
     .hero {
+      position: relative;
       padding: clamp(2.5rem, 8vw, 5rem) clamp(1rem, 4vw, 3rem) 3rem;
       max-width: 1100px;
       margin: 0 auto;
     }
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-family: var(--font-body);
+      font-size: 0.82rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--lad-warm);
+      border: 1px solid rgba(255, 184, 77, 0.35);
+      padding: 0.45rem 0.9rem;
+      border-radius: 999px;
+      margin-bottom: 1.25rem;
+      background: rgba(255, 94, 154, 0.06);
+    }
     .hero h1 {
       font-family: var(--font-display);
       font-weight: 800;
-      font-size: clamp(2.4rem, 6vw, 3.6rem);
-      line-height: 1.08;
+      font-size: clamp(2.2rem, 5.5vw, 3.5rem);
+      line-height: 1.05;
       letter-spacing: -0.04em;
       margin: 0 0 1rem;
     }
+    .hero h1 .word-med { color: var(--med); text-shadow: 0 0 48px rgba(62, 230, 214, 0.25); }
+    .hero h1 .word-lad {
+      background: linear-gradient(100deg, var(--lad) 0%, var(--lad-warm) 90%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .hero .tagline {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: clamp(1rem, 2vw, 1.2rem);
+      color: var(--lad-warm);
+      margin: 0 0 1.25rem;
+      letter-spacing: -0.02em;
+    }
     .hero .lede {
-      font-size: clamp(1.1rem, 2.2vw, 1.35rem);
+      font-size: clamp(1.02rem, 2vw, 1.2rem);
       color: var(--muted);
-      max-width: 52ch;
+      max-width: 56ch;
       margin: 0 0 1.75rem;
     }
-    .hero-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
     .pill-row {
       display: flex;
       flex-wrap: wrap;
@@ -221,17 +272,29 @@
       margin-top: 2rem;
     }
     .pill {
-      font-family: var(--font-display);
-      font-size: 0.78rem;
+      font-family: var(--font-body);
+      font-size: 0.76rem;
       font-weight: 600;
-      letter-spacing: 0.04em;
+      letter-spacing: 0.06em;
       text-transform: uppercase;
-      padding: 0.4rem 0.75rem;
+      padding: 0.42rem 0.8rem;
       border-radius: 999px;
       background: var(--bg-card);
       border: 1px solid var(--stroke);
       color: var(--muted);
     }
+    .pill.hot { border-color: rgba(255, 94, 154, 0.35); color: #f0b8d0; }
+
+    .name-story {
+      margin-top: 0.5rem;
+      padding: 1.5rem 1.5rem 1.5rem 1.75rem;
+      border-left: 4px solid;
+      border-image: linear-gradient(180deg, var(--med), var(--lad)) 1;
+      background: linear-gradient(90deg, rgba(62, 230, 214, 0.06), rgba(255, 94, 154, 0.04));
+      border-radius: 0 var(--radius) var(--radius) 0;
+    }
+    .name-story p { margin: 0; color: var(--muted); font-size: 1.02rem; }
+    .name-story strong { color: var(--text); }
 
     section.block {
       max-width: 1100px;
@@ -240,7 +303,7 @@
     }
     section.block h2 {
       font-family: var(--font-display);
-      font-size: clamp(1.5rem, 3vw, 2rem);
+      font-size: clamp(1.45rem, 3vw, 1.95rem);
       font-weight: 800;
       letter-spacing: -0.03em;
       margin: 0 0 1rem;
@@ -250,10 +313,10 @@
     }
     section.block h2::before {
       content: "";
-      width: 4px;
+      width: 5px;
       height: 1.1em;
       border-radius: 4px;
-      background: linear-gradient(180deg, var(--accent), var(--accent-2));
+      background: linear-gradient(180deg, var(--lad), var(--med));
     }
     section.block h3 {
       font-family: var(--font-display);
@@ -285,15 +348,15 @@
       vertical-align: top;
     }
     table.data th {
-      font-family: var(--font-display);
+      font-family: var(--font-body);
       font-weight: 700;
-      color: var(--accent);
+      color: var(--med);
       width: 22%;
     }
     table.data code {
       font-family: var(--font-mono);
       font-size: 0.82rem;
-      color: #a8d4ff;
+      color: #b8d4ff;
       word-break: break-all;
     }
 
@@ -301,7 +364,7 @@
       font-family: var(--font-mono);
       font-size: 0.82rem;
       line-height: 1.55;
-      background: #060a14;
+      background: #08050f;
       border: 1px solid var(--stroke);
       border-radius: 12px;
       padding: 1.1rem 1.25rem;
@@ -310,7 +373,7 @@
     }
     pre.code .k { color: #7fdbca; }
     pre.code .s { color: #a8d4ff; }
-    pre.code .c { color: #6b7a99; }
+    pre.code .c { color: #8b7aa8; }
 
     .grid-3 {
       display: grid;
@@ -323,6 +386,11 @@
       border: 1px solid var(--stroke);
       border-radius: 14px;
       padding: 1rem 1.1rem;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+    .mini-card:hover {
+      border-color: rgba(62, 230, 214, 0.25);
+      transform: translateY(-2px);
     }
     .mini-card strong {
       font-family: var(--font-display);
@@ -340,7 +408,7 @@
       color: var(--muted);
       font-size: 0.9rem;
     }
-    footer.site a { color: var(--accent); }
+    footer.site a { color: var(--lad-warm); }
 
     .faq details {
       background: var(--bg-card-solid);
@@ -354,14 +422,30 @@
       font-weight: 700;
       cursor: pointer;
       list-style: none;
+      font-size: 0.95rem;
     }
     .faq summary::-webkit-details-marker { display: none; }
-    .faq details[open] summary { margin-bottom: 0.5rem; color: var(--accent); }
+    .faq details[open] summary { margin-bottom: 0.5rem; color: var(--med); }
     .faq p { margin: 0; font-size: 0.95rem; color: var(--muted); }
 
+    @keyframes hero-shift {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.92; }
+    }
+    .hero-glow {
+      position: absolute;
+      width: min(480px, 90vw);
+      height: min(480px, 90vw);
+      top: -120px;
+      right: -80px;
+      background: radial-gradient(circle, rgba(255, 94, 154, 0.09) 0%, transparent 65%);
+      pointer-events: none;
+      animation: hero-shift 8s ease-in-out infinite;
+    }
     @media (prefers-reduced-motion: reduce) {
       html { scroll-behavior: auto; }
-      .btn-primary:hover { transform: none; }
+      .btn-primary:hover, .btn-secondary:hover { transform: none; }
+      .hero-glow { animation: none; }
     }
   </style>
 
@@ -372,18 +456,20 @@
       {
         "@type": "SoftwareSourceCode",
         "name": "MedLat",
-        "alternateName": ["medlat", "MedTok"],
-        "description": "PyTorch library for first-stage models (tokenizers, VAEs, quantizers) and second-stage generators (MaskGIT, MAR, DiT, LDM, ADM) with a unified model registry.",
+        "alternateName": ["medlat"],
+        "description": "MedLat (medical + mad-lad): PyTorch library for 2D computer vision and 3D volumetric medical data via one model registry—tokenizers, VAEs, quantizers, MaskGIT, MAR, DiT, LDM, ADM; use dims=2 or dims=3 on builders.",
         "license": "https://opensource.org/licenses/MIT",
         "codeRepository": "https://github.com/niklasbubeck/MedLat",
         "url": "https://niklasbubeck.github.io/MedLat/",
+        "version": "0.1.0",
+        "datePublished": "2025",
         "programmingLanguage": "Python",
         "runtimePlatform": "PyTorch",
         "author": {
           "@type": "Person",
           "name": "Niklas Bubeck"
         },
-        "keywords": "medical imaging, PyTorch, tokenizer, VAE, VQ, latent diffusion, DiT, MaskGIT, MAR, MONAI",
+        "keywords": "medical imaging, 2D computer vision, 3D medical imaging, volumetric data, PyTorch, tokenizer, VAE, VQ, latent diffusion, DiT, MaskGIT, MAR, MONAI, MedLat",
         "applicationCategory": "DeveloperApplication"
       },
       {
@@ -391,7 +477,7 @@
         "@id": "https://niklasbubeck.github.io/MedLat/#website",
         "name": "MedLat",
         "url": "https://niklasbubeck.github.io/MedLat/",
-        "description": "Project page for the MedLat PyTorch library: model registry, documentation summary, and links.",
+        "description": "MedLat project site—2D and 3D medical imaging, model registry, docs and links.",
         "publisher": {
           "@type": "Organization",
           "name": "MedLat",
@@ -400,7 +486,7 @@
       },
       {
         "@type": "WebPage",
-        "name": "MedLat — Medical imaging tokenizers, VAEs & latent generators",
+        "name": "MedLat — Medical depth, mad-lad code",
         "url": "https://niklasbubeck.github.io/MedLat/",
         "isPartOf": { "@id": "https://niklasbubeck.github.io/MedLat/#website" },
         "about": { "@id": "https://github.com/niklasbubeck/MedLat" },
@@ -411,10 +497,26 @@
         "mainEntity": [
           {
             "@type": "Question",
+            "name": "Why is it called MedLat?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "The name mixes medical—clinical imaging and responsible ML—with mad lad, British slang for someone bold and memorable. MedLat aims for that blend: rigorous models with swagger in the API design."
+            }
+          },
+          {
+            "@type": "Question",
             "name": "What is MedLat?",
             "acceptedAnswer": {
               "@type": "Answer",
               "text": "MedLat is a PyTorch package (import name medlat) that registers hundreds of first-stage models and generators behind string IDs. You use get_model, available_models, and get_model_info to instantiate architectures and read metadata."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Does MedLat support 2D and 3D?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. The same registered models are intended for standard 2D computer vision and for 3D volumetric medical data such as CT or MRI-style volumes. Pass dims=2 for planar inputs or dims=3 for volumetric inputs, together with consistent img_size and spatial layout, when constructing a model from the registry."
             }
           },
           {
@@ -442,16 +544,22 @@
 <body>
   <div class="bg-mesh" aria-hidden="true"></div>
   <div class="bg-grid" aria-hidden="true"></div>
+  <div class="bg-noise" aria-hidden="true"></div>
 
   <a class="skip-link" href="#main">Skip to main content</a>
 
   <header class="site" role="banner">
-    <a class="brand" href="./" aria-current="page">Med<span class="hl">Lat</span></a>
+    <a class="brand" href="./" aria-current="page" aria-label="MedLat home">
+      <span class="brand-med">Med</span><span class="brand-lad">Lat</span>
+    </a>
     <nav class="site-nav" aria-label="Page sections">
+      <a href="#name">The name</a>
+      <a href="#spatial">2D &amp; 3D</a>
       <a href="#overview">Overview</a>
       <a href="#install">Install</a>
       <a href="#quickstart">Quick start</a>
       <a href="#families">Model families</a>
+      <a href="#citation">Cite</a>
       <a href="#faq">FAQ</a>
     </nav>
     <div>
@@ -461,22 +569,52 @@
 
   <main id="main">
     <section class="hero" aria-labelledby="hero-title">
-      <h1 id="hero-title">Latent models for <span style="color: var(--accent);">medical</span> imaging &amp; visual AI</h1>
+      <div class="hero-glow" aria-hidden="true"></div>
+      <p class="hero-badge" role="status">Med · Lat · One registry</p>
+      <h1 id="hero-title">
+        <span class="word-med">Med</span>ical depth.
+        <span class="word-lad">Mad-lad</span> <span class="word-med">code</span>.
+      </h1>
+      <p class="tagline">The name? <strong>Medical</strong> meets <strong>mad lad</strong>—a cool library that still takes imaging seriously.</p>
       <p class="lede">
-        <strong>MedLat</strong> (<code style="font-family:var(--font-mono);font-size:0.95em;color:var(--accent);">medlat</code>) unifies
-        first-stage tokenizers and autoencoders with second-stage generators behind one
-        <strong>model registry</strong>—instantiate by ID, list configs, and attach papers or upstream code when available.
+        <strong>MedLat</strong> (<code style="font-family:var(--font-mono);font-size:0.95em;color:var(--med);">medlat</code>) wires
+        first-stage tokenizers and autoencoders to second-stage generators through one
+        <strong>model registry</strong>: hundreds of IDs, one API—<code>get_model</code>, <code>available_models</code>, <code>get_model_info</code>.
+        Every family is available for <strong>2D computer vision</strong> <em>and</em> <strong>3D volumetric medical data</strong>—switch with <code>dims=2</code> vs <code>dims=3</code> (and matching spatial sizes).
       </p>
       <div class="hero-actions">
-        <a class="btn btn-primary" href="https://github.com/niklasbubeck/MedLat">View repository</a>
-        <a class="btn btn-ghost" href="./llms.txt">llms.txt (for agents)</a>
+        <a class="btn btn-primary" href="https://github.com/niklasbubeck/MedLat">Grab the repo</a>
+        <a class="btn btn-secondary" href="#quickstart">Quick start</a>
+        <a class="btn btn-ghost" href="./llms.txt">llms.txt</a>
       </div>
       <div class="pill-row" aria-label="Technology tags">
         <span class="pill">PyTorch</span>
-        <span class="pill">Model registry</span>
+        <span class="pill hot">Model registry</span>
         <span class="pill">VQ / VAE / DiT</span>
         <span class="pill">MONAI</span>
+        <span class="pill hot">2D + 3D volumes</span>
         <span class="pill">MIT License</span>
+      </div>
+    </section>
+
+    <section class="block" id="spatial" aria-labelledby="h-spatial">
+      <h2 id="h-spatial">2D vision &amp; 3D medical data</h2>
+      <p style="color:var(--muted);margin-top:0;max-width:65ch">
+        All registered architectures are available for <strong style="color:var(--text)">standard 2D pipelines</strong> (natural images, 2D slices, projections)
+        and for <strong style="color:var(--text)">3D volumetric imaging</strong> (e.g. CT/MRI-style volumes). The registry IDs are the same—use constructor
+        arguments such as <code><span style="color:var(--med)">dims=2</span></code> or <code><span style="color:var(--lad-warm)">dims=3</span></code> plus
+        consistent <code>img_size</code> / spatial layout when you call <code>get_model(...)</code>.
+      </p>
+    </section>
+
+    <section class="block" id="name" aria-labelledby="h-why-name">
+      <h2 id="h-why-name">Why “MedLat”?</h2>
+      <div class="name-story card">
+        <p>
+          <strong>Med</strong> is the mission: medical imaging, solid evaluation, and latent representations you can trust.
+          <strong>Lat</strong> nods to <em>mad lad</em>—British slang for someone bold, a bit cheeky, impossible to ignore.
+          Put them together and you get a framework that does not hide behind beige enterprise: it’s <strong>rigorous</strong> where it counts and <strong>fun</strong> to ship.
+        </p>
       </div>
     </section>
 
@@ -485,11 +623,16 @@
       <p>
         Typical workflow: <strong>train or load a first-stage model</strong> → <strong>attach a generator</strong> whose tensor geometry matches
         the tokenizer or VAE (<code>num_tokens</code>, <code>embed_dim</code>, <code>seq_len</code>, stride, etc.) → <strong>sample or train</strong> using the bundled notebooks.
+        Choose <strong>planar or volumetric</strong> inputs up front via <code>dims</code> and spatial config.
       </p>
       <div class="grid-3" style="margin-top:1.25rem">
         <article class="mini-card">
+          <strong>2D &amp; 3D</strong>
+          <span>One registry for 2D CV and 3D medical volumes—<code>dims=2</code> vs <code>dims=3</code> on the same model IDs.</span>
+        </article>
+        <article class="mini-card">
           <strong>First stage</strong>
-          <span>Maps images to compact representations: continuous latents, discrete codes, or token sequences.</span>
+          <span>Maps images or volumes to compact representations: continuous latents, discrete codes, or token sequences.</span>
         </article>
         <article class="mini-card">
           <strong>Generator</strong>
@@ -525,6 +668,7 @@ pip install -e .</pre>
 <span class="c"># Metadata: description, paper_url, code_url when set</span>
 <span class="k">print</span>(get_model_info(<span class="s">"continuous.aekl.f8_d16"</span>))
 
+<span class="c"># dims=2 for 2D CV, dims=3 for volumetric medical data (adjust img_size accordingly)</span>
 tokenizer = get_model(<span class="s">"token.titok.s_128"</span>, img_size=<span class="s">128</span>, dims=<span class="s">2</span>)
 
 generator = get_model(
@@ -564,8 +708,8 @@ wrapper = GenWrapper(generator, tokenizer)</pre>
       </div>
     </section>
 
-    <section class="block" id="naming" aria-labelledby="h-name">
-      <h2 id="h-name">Registry ID conventions</h2>
+    <section class="block" id="naming" aria-labelledby="h-naming">
+      <h2 id="h-naming">Registry ID conventions</h2>
       <ul style="color:var(--muted);margin:0;padding-left:1.25rem">
         <li><strong style="color:var(--text)"><code>f{N}</code></strong> — spatial downsampling factor at the bottleneck.</li>
         <li><strong style="color:var(--text)"><code>d{N}</code></strong> — latent width / embedding dimension (family-specific).</li>
@@ -636,6 +780,25 @@ wrapper = GenWrapper(generator, tokenizer)</pre>
       </div>
     </section>
 
+    <section class="block" id="citation" aria-labelledby="h-cite">
+      <h2 id="h-cite">Citation</h2>
+      <p style="color:var(--muted);margin-top:0;max-width:62ch">
+        If you use MedLat in a paper or project, cite the software. Update the <strong>version</strong> string if you rely on a different release (see <code>pyproject.toml</code>).
+      </p>
+      <h3 style="margin-top:1.25rem;font-size:1rem;color:var(--lad-warm)">BibTeX</h3>
+      <pre class="code" tabindex="0"><span class="k">@software</span>{bubeck_medlat_2025,
+  author = {Bubeck, Niklas},
+  title = {{MedLat}: {PyTorch} library for first-stage models and latent generators},
+  url = {https://github.com/niklasbubeck/MedLat},
+  version = {0.1.0},
+  year = {2025},
+}</pre>
+      <h3 style="margin-top:1.25rem;font-size:1rem;color:var(--lad-warm)">Plain text (APA-style)</h3>
+      <blockquote class="card" style="margin:0.75rem 0 0;border-left:3px solid var(--med);font-style:italic;color:var(--muted)">
+        Bubeck, N. (2025). <em>MedLat</em> (Version 0.1.0) [Computer software]. https://github.com/niklasbubeck/MedLat
+      </blockquote>
+    </section>
+
     <section class="block" id="notebooks" aria-labelledby="h-nb">
       <h2 id="h-nb">Example notebooks</h2>
       <table class="data card">
@@ -651,12 +814,20 @@ wrapper = GenWrapper(generator, tokenizer)</pre>
     <section class="block faq" id="faq" aria-labelledby="h-faq">
       <h2 id="h-faq">FAQ</h2>
       <details>
+        <summary>Why is it called MedLat?</summary>
+        <p>It’s a blend of <strong>medical</strong> (the science we care about) and <strong>mad lad</strong> (slang for someone bold and memorable). The library is meant to feel capable and a little irreverent—without cutting corners on imaging.</p>
+      </details>
+      <details>
         <summary>What is MedLat?</summary>
         <p>A PyTorch library that registers first-stage and generator architectures under string IDs. Import <code>medlat</code> and call <code>get_model("registry.id", **kwargs)</code>.</p>
       </details>
       <details>
-        <summary>MedTok vs MedLat?</summary>
-        <p>This repository may live in a folder named MedTok; the Python package and remote are <strong>MedLat</strong> / <code>medlat</code>. Treat <code>github.com/niklasbubeck/MedLat</code> as the source of truth.</p>
+        <summary>2D computer vision and 3D medical volumes?</summary>
+        <p>Yes. The same registry covers <strong>2D</strong> pipelines (natural images, slices) and <strong>3D</strong> volumetric data (e.g. CT/MRI-style volumes). Pass <code>dims=2</code> or <code>dims=3</code> (and matching <code>img_size</code> / spatial layout) when you build a model.</p>
+      </details>
+      <details>
+        <summary>What is the Python package name?</summary>
+        <p>The project is <strong>MedLat</strong>; import the library as <code>import medlat</code> (see <code>pyproject.toml</code>).</p>
       </details>
       <details>
         <summary>Where is the full specification?</summary>
@@ -671,9 +842,10 @@ wrapper = GenWrapper(generator, tokenizer)</pre>
 
   <footer class="site" role="contentinfo">
     <p>
-      MIT License · MedLat / <code>medlat</code> ·
+      <strong>MedLat</strong> — <span style="color:var(--med)">med</span>ical rigour, <span style="color:var(--lad-warm)">mad-lad</span> energy · MIT License ·
+      <code>medlat</code> ·
       <a href="https://github.com/niklasbubeck/MedLat">GitHub</a>
-      · Structured data (JSON-LD) embedded for search engines.
+      · JSON-LD for search.
     </p>
   </footer>
 </body>
