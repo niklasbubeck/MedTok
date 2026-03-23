@@ -1,10 +1,12 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+# setuptools 69+ adds PEP 639 "License-File" in wheel metadata; older twine fails
+# `twine check` with "unrecognized field 'license-file'". Pin until twine/packaging catch up.
+requires = ["setuptools>=61.0,<69", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "medlat"
-version = "0.1.0"
+version = "0.1.1"
 description = "A comprehensive collection of quantizers, continuous autoencoders, and tokenizers for medical imaging and general visual data processing"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -54,6 +56,8 @@ dev = [
     "black>=23.0.0",
     "flake8>=6.0.0",
     "mypy>=1.0.0",
+    "build>=1.0.0",
+    "twine>=5.1.0",
 ]
 
 [tool.setuptools]

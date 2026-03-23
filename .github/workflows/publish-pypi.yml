@@ -1,0 +1,39 @@
+# Build and upload to PyPI when you push a version tag (e.g. v0.1.0).
+# Prerequisites: repo secret PYPI_API_TOKEN (PyPI → Account → API tokens), or configure
+# PyPI "trusted publisher" for this repo and omit the secret (OIDC).
+# See: https://docs.pypi.org/trusted-publishers/
+
+name: Publish to PyPI
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tools
+        run: python -m pip install --upgrade pip build
+
+      - name: Build sdist and wheel
+        run: python -m build
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # Remove this block after enabling OIDC trusted publishing on pypi.org for this repo
+          password: ${{ secrets.PYPI_API_TOKEN }}
