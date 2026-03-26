@@ -30,6 +30,7 @@ import numpy as np
 import random
 from src.losses.loss import ARLoss
 from tqdm import tqdm
+from medlat.modules.pos_embed import to_ntuple
 
 # util function
 def build_causal_mask(seq_length):
@@ -186,18 +187,20 @@ class Block(nn.Module):
 
 class RAR(nn.Module):
     def __init__(self, img_size=256, vae_stride=16, codebook_size=1024, width=768,
-                 depth=12, heads=12, mlp_ratio=4, dropout=0.1, attn_dropout=0.1, num_classes=1000, use_checkpoint=False, **kwargs):
+                 depth=12, heads=12, mlp_ratio=4, dropout=0.1, attn_dropout=0.1, num_classes=1000, use_checkpoint=False, dims=2, **kwargs):
         super().__init__()
-        
+
         # parse the configs
         self.width = width
         self.depth = depth
         self.heads = heads
         self.intermediate_size = width * mlp_ratio
         self.mlp_ratio = mlp_ratio
-    
+        self.dims = dims
 
-        self.image_seq_len = (img_size // vae_stride) ** 2
+        _img_size   = to_ntuple(img_size,   dims)
+        _vae_stride = to_ntuple(vae_stride, dims)
+        self.image_seq_len = int(np.prod([i // s for i, s in zip(_img_size, _vae_stride)]))
         self.codebook_size = codebook_size
         self.num_classes = num_classes
         norm_layer=partial(nn.LayerNorm, eps=1e-6)

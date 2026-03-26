@@ -6,6 +6,15 @@ import torch
 import torch.nn as nn
 
 
+def to_ntuple(value: int | Sequence[int], dims: int) -> Tuple[int, ...]:
+    """Normalize an int or sequence to a tuple of length *dims*."""
+    if isinstance(value, Sequence):
+        if len(value) != dims:
+            raise ValueError(f"Expected {dims} values, got {len(value)}")
+        return tuple(int(v) for v in value)
+    return (int(value),) * dims
+
+
 def _to_tuple(value: int | Sequence[int], dims: int) -> Tuple[int, ...]:
     if isinstance(value, Sequence):
         if len(value) != dims:

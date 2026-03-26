@@ -42,11 +42,14 @@ classifiers = [
 
 dependencies = [
     "torch>=1.9.0",
+    "torchvision>=0.10.0",
     "numpy>=1.21.0",
     "einops>=0.4.0",
     "timm>=0.6.0",
     "omegaconf>=2.1.0",
     "monai>=1.0.0",
+    "opencv-python-headless>=4.5.0",
+    "open-clip-torch>=2.0.0",
 ]
 
 [project.optional-dependencies]

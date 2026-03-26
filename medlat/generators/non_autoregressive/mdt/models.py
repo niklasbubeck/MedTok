@@ -5,7 +5,7 @@ import math
 from timm.models.vision_transformer import Mlp
 from timm.layers import trunc_normal_
 from medlat.modules.in_and_out import PatchEmbed, ToPixel
-from medlat.modules.pos_embed import get_2d_sincos_pos_embed
+from medlat.modules.pos_embed import get_2d_sincos_pos_embed, to_ntuple
 
 def modulate(x, shift, scale):
     return x * (1 + scale.unsqueeze(1)) + shift.unsqueeze(1)
@@ -265,16 +265,19 @@ class MDTv2(nn.Module):
         learn_sigma=True,
         mask_ratio=0.3,
         decode_layer=4,
+        dims=2,
     ):
         super().__init__()
         self.learn_sigma = learn_sigma
         self.in_channels = in_channels
         self.out_channels = in_channels * 2 if learn_sigma else in_channels
-        self.patch_size = patch_size
+        self.dims = dims
+        self.patch_size = to_ntuple(patch_size, dims)
         self.num_heads = num_heads
         decode_layer = int(decode_layer)
+        input_size = to_ntuple(input_size, dims)
 
-        self.x_embedder = PatchEmbed(to_embed='conv', img_size=input_size, patch_size=patch_size, in_chans=in_channels, embed_dim=hidden_size)
+        self.x_embedder = PatchEmbed(to_embed='conv', img_size=input_size, patch_size=self.patch_size, in_chans=in_channels, embed_dim=hidden_size)
         self.t_embedder = TimestepEmbedder(hidden_size)
         self.y_embedder = LabelEmbedder(
             num_classes, hidden_size, class_dropout_prob)
@@ -313,7 +316,6 @@ class MDTv2(nn.Module):
                 1, 1, hidden_size), requires_grad=False)
             self.mask_ratio = None
             self.decode_layer = int(decode_layer)
-        print("mask ratio:", self.mask_ratio, "decode_layer:", self.decode_layer)
         self.initialize_weights()
 
     def initialize_weights(self):
@@ -449,7 +451,6 @@ class MDTv2(nn.Module):
             # masking: length -> length * mask_ratio
             rand_mask_ratio = torch.rand(1, device=x.device)  # noise in [0, 1]
             rand_mask_ratio = rand_mask_ratio * 0.2 + self.mask_ratio # mask_ratio, mask_ratio + 0.2 
-            # print(rand_mask_ratio)
             x, mask, ids_restore, ids_keep = self.random_masking(
                 x, rand_mask_ratio)
             masked_stage = True

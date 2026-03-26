@@ -12,6 +12,7 @@ from torch.utils.checkpoint import checkpoint
 from timm.models.vision_transformer import Block
 
 from medlat.diffusion.diffloss import DiffLoss
+from medlat.modules.pos_embed import to_ntuple
 
 __all__ = ['MAR']
 
@@ -42,19 +43,22 @@ class MAR(nn.Module):
                  num_sampling_steps='100',
                  diffusion_batch_mul=4,
                  grad_checkpointing=False,
+                 dims=2,
                  ):
         super().__init__()
 
         # --------------------------------------------------------------------------
         # VAE and patchify specifics
         self.in_channels = in_channels
+        self.dims = dims
 
-        self.img_size = img_size
-        self.vae_stride = vae_stride
-        self.patch_size = patch_size
-        self.seq_h = self.seq_w = img_size // vae_stride // patch_size
+        self.img_size   = to_ntuple(img_size,   dims)
+        self.vae_stride = to_ntuple(vae_stride, dims)
+        self.patch_size = to_ntuple(patch_size, dims)
+        self.seq_h = self.img_size[0] // self.vae_stride[0] // self.patch_size[0]
+        self.seq_w = self.img_size[1] // self.vae_stride[1] // self.patch_size[1]
         self.seq_len = self.seq_h * self.seq_w
-        self.token_embed_dim = in_channels * patch_size**2
+        self.token_embed_dim = in_channels * int(np.prod(self.patch_size))
         self.grad_checkpointing = grad_checkpointing
 
         # --------------------------------------------------------------------------
@@ -145,26 +149,26 @@ class MAR(nn.Module):
                 nn.init.constant_(m.weight, 1.0)
 
     def patchify(self, x):
-        if len(x.shape) == 5: 
+        if len(x.shape) == 5:
             x = x[:, :, 0, ...]
         bsz, c, h, w = x.shape
-        p = self.patch_size
-        h_, w_ = h // p, w // p
+        ph, pw = self.patch_size
+        h_, w_ = h // ph, w // pw
 
-        x = x.reshape(bsz, c, h_, p, w_, p)
+        x = x.reshape(bsz, c, h_, ph, w_, pw)
         x = torch.einsum('nchpwq->nhwcpq', x)
-        x = x.reshape(bsz, h_ * w_, c * p ** 2)
+        x = x.reshape(bsz, h_ * w_, c * ph * pw)
         return x  # [n, l, d]
 
     def unpatchify(self, x):
         bsz = x.shape[0]
-        p = self.patch_size
+        ph, pw = self.patch_size
         c = self.in_channels
         h_, w_ = self.seq_h, self.seq_w
 
-        x = x.reshape(bsz, h_, w_, c, p, p)
+        x = x.reshape(bsz, h_, w_, c, ph, pw)
         x = torch.einsum('nhwcpq->nchpwq', x)
-        x = x.reshape(bsz, c, h_ * p, w_ * p)
+        x = x.reshape(bsz, c, h_ * ph, w_ * pw)
         return x  # [n, c, h, w]
 
     def sample_orders(self, bsz):
@@ -257,10 +261,18 @@ class MAR(nn.Module):
         return loss
 
     def forward(self, imgs, y=None, dataset_id=None):
+        bsz = imgs.size(0)
 
-        # class embed
-        class_embedding = self.class_emb(y)
-        
+        # class embed – support both conditional (y provided) and unconditional (y=None)
+        if y is not None:
+            class_embedding = self.class_emb(y)
+            if self.training and self.label_drop_prob > 0:
+                drop_mask = (torch.rand(bsz) < self.label_drop_prob).unsqueeze(-1)
+                drop_mask = drop_mask.to(class_embedding.device).to(class_embedding.dtype)
+                class_embedding = drop_mask * self.fake_latent + (1 - drop_mask) * class_embedding
+        else:
+            class_embedding = self.fake_latent.expand(bsz, -1)
+
         # dataset embed (optional)
         dataset_embedding = None
         if self.use_dataset_conditioning and dataset_id is not None:

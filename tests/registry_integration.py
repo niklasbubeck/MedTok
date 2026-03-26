@@ -11,10 +11,7 @@ Covers:
 
 Skip policies:
   - adm.*         : return config dicts, not nn.Module
-  - mar.*         : mask_by_order() has hardcoded .cuda() → GPU only
-  - fractal.*     : hardcoded .cuda() in forward → GPU only
-  - rar.*         : hardcoded .cuda() in forward → GPU only
-  - mage.*        : hardcoded .cuda() in forward → GPU only
+  - fractal.*     : model architecture too large for CPU forward test (32-block, embed_dim=1024)
   - token.softvq.* / token.maetok.* alignment heads : download DINO/CLIP → network
 """
 
@@ -176,7 +173,7 @@ run("dit.s_2", lambda: get_model("dit.s_2", img_size=32, vae_stride=4, num_class
 run("dit.b_2", lambda: get_model("dit.b_2", img_size=32, vae_stride=4, num_classes=10))
 run("dit.xl_2", lambda: get_model("dit.xl_2", img_size=32, vae_stride=4, num_classes=10))
 
-# ---- Generator – MAR (instantiation only; forward has hardcoded .cuda()) ----
+# ---- Generator – MAR ----
 run("mar.b", lambda: get_model("mar.b"))
 run("mar.l", lambda: get_model("mar.l"))
 
@@ -184,7 +181,7 @@ run("mar.l", lambda: get_model("mar.l"))
 run("maskgit.b", lambda: get_model("maskgit.b", num_tokens=512, seq_len=16, num_classes=10))
 run("maskgit.l", lambda: get_model("maskgit.l", num_tokens=512, seq_len=16, num_classes=10))
 
-# ---- Generator – MAGE (instantiation only; forward has hardcoded .cuda()) ----
+# ---- Generator – MAGE ----
 run("mage.xs_16", lambda: get_model("mage.xs_16", num_tokens=512, img_size=64))
 run("mage.b_8",   lambda: get_model("mage.b_8",   num_tokens=1024, img_size=256))
 
@@ -194,7 +191,7 @@ run("maskbit.s",
 run("maskbit.b",   lambda: get_model("maskbit.b"))
 run("maskbit.bert_b", lambda: get_model("maskbit.bert_b"))
 
-# ---- Generator – RAR (instantiation only; forward has hardcoded .cuda()) ----
+# ---- Generator – RAR ----
 run("rar.b", lambda: get_model("rar.b"))
 run("rar.l", lambda: get_model("rar.l"))
 
@@ -214,7 +211,7 @@ run("uvit.small",      lambda: get_model("uvit.small",      img_size=32, patch_s
 run("uvit.small_deep", lambda: get_model("uvit.small_deep", img_size=32, patch_size=4))
 run("uvit.mid",        lambda: get_model("uvit.mid",        img_size=32, patch_size=4))
 
-# ---- Generator – Fractal (instantiation only; forward has hardcoded .cuda()) ----
+# ---- Generator – Fractal ----
 run("fractal.ar_64",        lambda: get_model("fractal.ar_64"))
 run("fractal.mar_64",       lambda: get_model("fractal.mar_64"))
 run("fractal.mar_base_256", lambda: get_model("fractal.mar_base_256"))
@@ -346,16 +343,26 @@ def _maskgit_forward():
     x = torch.randint(0, num_tokens, (B, seq_len))
     y = torch.randint(0, num_classes, (B,))
     with torch.no_grad():
-        logits = model.forward_encoder(x, y)
-    # logits shape: (B, seq_len+1, vocab_size) where vocab = num_tokens + num_classes + 1
-    assert logits.shape[0] == B, f"Bad batch dim {logits.shape}"
+        x_out, gt_indices, token_drop_mask, token_all_mask = model.forward_encoder(x, y)
+    assert x_out.shape[0] == B, f"Bad batch dim {x_out.shape}"
 
 run("maskgit.b forward_encoder", _maskgit_forward)
 
 
-# ---- MAR: GPU only, skip forward ----
-run("mar.b forward", lambda: None,
-    skip=True, skip_reason="mask_by_order() has hardcoded .cuda()")
+# ---- MAR forward ----
+def _mar_forward():
+    img_size, vae_stride, in_channels, num_classes, B = 16, 4, 4, 10, 2
+    model = get_model("mar.b", img_size=img_size, vae_stride=vae_stride,
+                      in_channels=in_channels, class_num=num_classes,
+                      diffloss_d=2, diffloss_w=64)
+    model.eval()
+    x = torch.randn(B, in_channels, img_size // vae_stride, img_size // vae_stride)
+    y = torch.randint(0, num_classes, (B,))
+    with torch.no_grad():
+        loss = model(x, y)
+    assert loss.ndim == 0, f"Expected scalar loss, got shape {loss.shape}"
+
+run("mar.b forward", _mar_forward)
 
 
 # ---- MDT forward (from existing suite) ----
@@ -452,10 +459,44 @@ run("taming.gpt_l forward", lambda: _taming_forward("taming.gpt_l"))
 run("taming.gpt_h forward", lambda: _taming_forward("taming.gpt_h"))
 
 
-# ---- GPU-only models (forward skip) ----
-for name in ["fractal.ar_64", "fractal.mar_64", "mage.xs_16", "mage.b_8", "rar.b", "rar.l"]:
+# ---- MAGE forward ----
+def _mage_forward():
+    num_tokens, img_size, B = 512, 32, 2
+    model = get_model("mage.xs_16", num_tokens=num_tokens, img_size=img_size)
+    model.eval()
+    seq_len = (img_size // 16) ** 2  # patch_size=16 for xs_16
+    imgs = torch.randint(0, num_tokens, (B, seq_len))
+    with torch.no_grad():
+        loss, _, _ = model(imgs)
+    assert loss.ndim == 0, f"Expected scalar loss, got {loss.shape}"
+
+run("mage.xs_16 forward", _mage_forward)
+
+
+# ---- RAR forward ----
+def _rar_forward():
+    # Use force_one_d_seq to bypass PatchEmbed's img_size assertion and feed
+    # a pre-flattened token sequence directly (as done at inference time).
+    B, num_classes, seq_len, token_channels = 2, 10, 8, 8
+    model = get_model("rar.b",
+                      token_channels=token_channels,
+                      num_classes=num_classes, diffloss_d=2, diffloss_w=64,
+                      force_one_d_seq=seq_len)
+    model.eval()
+    # token_embed_dim = token_channels * prod(patch_size=(1,1)) = token_channels
+    x = torch.randn(B, seq_len, token_channels)
+    labels = torch.randint(0, num_classes, (B,))
+    with torch.no_grad():
+        loss = model(x, labels)
+    assert loss.ndim == 0, f"Expected scalar loss, got {loss.shape}"
+
+run("rar.b forward", _rar_forward)
+
+
+# ---- Fractal forward (skip: 32-block, embed_dim=1024 — too slow on CPU) ----
+for name in ["fractal.ar_64", "fractal.mar_64"]:
     run(f"{name} forward", lambda: None,
-        skip=True, skip_reason="hardcoded .cuda() in forward")
+        skip=True, skip_reason="32-block embed_dim=1024 architecture too slow for CPU forward test")
 
 
 # ---------------------------------------------------------------------------

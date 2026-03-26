@@ -289,9 +289,7 @@ class MaskedGenerativeEncoderViT(nn.Module):
                 break
             else:
                 print("Rerandom the noise!")
-        # print(mask_rate, num_dropped_tokens, num_masked_tokens, token_drop_mask.sum(dim=1), token_all_mask.sum(dim=1))
         token_indices[token_all_mask.nonzero(as_tuple=True)] = self.mask_token_label
-        # print("Masekd num token:", torch.sum(token_indices == self.mask_token_label, dim=1))
 
         # concate class token
         token_indices = torch.cat([torch.zeros(token_indices.size(0), 1, device=token_indices.device), token_indices], dim=1)
@@ -301,20 +299,17 @@ class MaskedGenerativeEncoderViT(nn.Module):
         token_indices = token_indices.long()
         # bert embedding
         input_embeddings = self.token_emb(token_indices)
-        # print("Input embedding shape:", input_embeddings.shape)
         bsz, seq_len, emb_dim = input_embeddings.shape
 
         # dropping
         token_keep_mask = 1 - token_drop_mask
         input_embeddings_after_drop = input_embeddings[token_keep_mask.nonzero(as_tuple=True)].reshape(bsz, -1, emb_dim)
-        # print("Input embedding after drop shape:", input_embeddings_after_drop.shape)
 
         # apply Transformer blocks
         x = input_embeddings_after_drop
         for blk in self.blocks:
             x = blk(x)
         x = self.norm(x)
-        # print("Encoder representation shape:", x.shape)
 
         return x, gt_indices, token_drop_mask, token_all_mask
 

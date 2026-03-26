@@ -99,7 +99,6 @@ class BeatGANsUNetModel(nn.Module):
                     out_ch=ch
                     ch=ch+conf.label_channel_num #Basically set the input ch as ch+concatnated layers
                     self.where_to_insert=len(self.input_blocks) #Track the place for insertion so that we can feed additional code
-                    print("CONCAT AT LEVEL {0} with input ch {1} output ch {2}".format(self.where_to_insert,ch,out_ch))
                 else:
                     out_ch = ch
                 resolution //= 2
@@ -259,7 +258,6 @@ class BeatGANsUNetModel(nn.Module):
             for j in range(self.input_num_blocks[i]):
                 if k ==self.where_to_insert:
                     h=self.input_blocks[k](h,extra=seg_style,emb=emb)
-                    print("CONCAT")
                 else:
                     h = self.input_blocks[k](h, emb=emb)
                 hs[i].append(h)

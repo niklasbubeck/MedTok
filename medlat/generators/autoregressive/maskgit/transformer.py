@@ -5,7 +5,7 @@ import torch.nn as nn
 
 from timm.models.vision_transformer import DropPath, Mlp
 
-from medlat.modules.pos_embed import get_2d_sincos_pos_embed
+from medlat.modules.pos_embed import get_2d_sincos_pos_embed, to_ntuple
 
 from omegaconf import OmegaConf
 import numpy as np
@@ -166,12 +166,16 @@ class MaskGIT(nn.Module):
                  dataset_label_drop_prob=0.0,
                  label_drop_prob=0.1,  # Classifier-free guidance: probability of dropping class label
                  seq_len=None,
+                 dims=2,
                 ):
         super().__init__()
 
+        self.dims = dims
         self.num_classes = num_classes                                             # Number of classes
         if seq_len is None and vae_stride is not None:
-            self.seq_len = (img_size // vae_stride) ** 2  
+            _img_size   = to_ntuple(img_size,   dims)
+            _vae_stride = to_ntuple(vae_stride, dims)
+            self.seq_len = int(np.prod([i // s for i, s in zip(_img_size, _vae_stride)]))
         elif seq_len is not None:
             self.seq_len = seq_len
         else:
@@ -182,7 +186,6 @@ class MaskGIT(nn.Module):
         self.mask_token_label = vocab_size - 1
         self.label_drop_prob = label_drop_prob
         self.dataset_label_drop_prob = dataset_label_drop_prob
-        print(f"Dataset label drop probability: {dataset_label_drop_prob}")
 
         self.token_emb = BertEmbeddings(vocab_size=vocab_size,
                                         hidden_size=embed_dim,
@@ -283,9 +286,7 @@ class MaskGIT(nn.Module):
                 break
             else:
                 print("Rerandom the noise!")
-        # print(mask_rate, num_dropped_tokens, num_masked_tokens, token_drop_mask.sum(dim=1), token_all_mask.sum(dim=1))
         token_indices[token_all_mask.nonzero(as_tuple=True)] = self.mask_token_label
-        # print("Masekd num token:", torch.sum(token_indices == self.mask_token_label, dim=1))
 
         # Determine class token labels
         # Class labels are in range [codebook_size, codebook_size + num_classes)

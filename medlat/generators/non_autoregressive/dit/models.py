@@ -237,9 +237,7 @@ class DiT(nn.Module):
         if isinstance(patch_size, int):
             self.patch_size = (patch_size,) * self.dims
 
-        print(f"img_size: {self.img_size}, vae_stride: {vae_stride}")
         self.img_size = tuple(i // v for i, v in zip(self.img_size, (vae_stride,) * self.dims))
-        print(f"img_size: {self.img_size}, patch_size: {self.patch_size}")
 
         self.learn_sigma = learn_sigma
         self.in_channels = in_channels
