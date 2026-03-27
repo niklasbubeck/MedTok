@@ -629,6 +629,8 @@ class MaisiEncoder(nn.Module):
         if len(num_res_blocks) != len(num_channels):
             raise ValueError("num_res_blocks and num_channels must have the same size")
 
+        self.vae_stride = 2 ** (len(num_channels) - 1)
+
         self.save_mem = save_mem
 
         self.z_channels = out_channels
