@@ -118,23 +118,11 @@ class Attend(nn.Module):
         if self.flash and not force_non_flash:
             return self.flash_attn(q, k, v, mask = mask)
 
-        # similarity
-
-        sim = einsum("b h i d, b h j d -> b h i j", q, k) * self.scale
-
-        # masking
-
-        if exists(mask):
-            mask_value = -torch.finfo(sim.dtype).max
-            sim = sim.masked_fill(~mask, mask_value)
-
-        # attention
-
-        attn = sim.softmax(dim = -1)
-        attn = self.attn_dropout(attn)
-
-        # aggregate values
-
-        out = einsum("b h i j, b h j d -> b h i d", attn, v)
+        out = F.scaled_dot_product_attention(
+            q, k, v,
+            attn_mask=mask if exists(mask) else None,
+            dropout_p=self.dropout if self.training else 0.0,
+            scale=self.scale,
+        )
 
         return out

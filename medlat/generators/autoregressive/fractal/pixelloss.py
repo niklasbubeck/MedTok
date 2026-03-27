@@ -3,6 +3,7 @@ from functools import partial
 import math
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from timm.models.vision_transformer import DropPath, Mlp
 
@@ -64,7 +65,7 @@ class CausalAttention(nn.Module):
         q, k, v = qkv.unbind(0)
         q, k = self.q_norm(q), self.k_norm(k)
 
-        x = scaled_dot_product_attention(
+        x = F.scaled_dot_product_attention(
             q,
             k,
             v,

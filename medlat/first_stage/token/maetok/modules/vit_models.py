@@ -87,11 +87,10 @@ class Attention(nn.Module):
                 q = torch.cat([q[:, :, :num_prefix_tokens], q_rot, q[:, :, -num_latent_tokens:]], dim=2)
                 k = torch.cat([k[:, :, :num_prefix_tokens], k_rot, k[:, :, -num_latent_tokens:]], dim=2)
         
-        q = q * self.scale
-        attn = q @ k.transpose(-2, -1)
-        attn = attn.softmax(dim=-1)
-        attn = self.attn_drop(attn)
-        x = attn @ v
+        x = F.scaled_dot_product_attention(
+            q, k, v,
+            dropout_p=self.attn_drop.p if self.training else 0.0,
+        )
         x = x.transpose(1, 2).reshape(B, N, C)
         
         x = self.proj(x)

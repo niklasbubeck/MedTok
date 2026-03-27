@@ -21,6 +21,14 @@
 ## Integration
 - Glue module: `medlat.modules.wrapper.GenWrapper` pairs generator + first stage; respects discrete/continuous and autoregressive/non-autoregressive routes.
 
+## Attention backends (PyTorch SDPA)
+- All models use `torch.nn.functional.scaled_dot_product_attention` (SDPA). PyTorch auto-selects the best kernel: FlashAttention (fastest, CUDA + fp16/bf16), memory-efficient attention, or math (universal fallback).
+- Override with `torch.nn.attention.sdpa_kernel(SDPBackend.FLASH_ATTENTION)` context manager (PyTorch ≥ 2.3) or `torch.backends.cuda.sdp_kernel(enable_flash=True, ...)` (PyTorch 2.0/2.1).
+- MDT: float additive relative-position bias as attn_mask — FlashAttention not supported; PyTorch falls back automatically.
+- Taming GPT: `is_causal=True` for training, `is_causal=False` for KV-cache inference.
+- VMAE: falls back to manual attention only when `return_attn_map=True`.
+- UViT / TiTok: use `ATTENTION_MODE` flag; SDPA is the default.
+
 ## Citation
 BibTeX key `bubeck_medlat_2025` — see README.md **Citation** section or project page `#citation`. Default: Bubeck, N. (2025). *MedLat* v0.1.0. https://github.com/niklasbubeck/MedLat
 

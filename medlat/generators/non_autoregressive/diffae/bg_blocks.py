@@ -495,15 +495,13 @@ class QKVAttentionLegacy(nn.Module):
         bs, width, length = qkv.shape
         assert width % (3 * self.n_heads) == 0
         ch = width // (3 * self.n_heads)
-        q, k, v = qkv.reshape(bs * self.n_heads, ch * 3, length).split(ch,
-                                                                       dim=1)
-        scale = 1 / math.sqrt(math.sqrt(ch))
-        weight = th.einsum(
-            "bct,bcs->bts", q * scale,
-            k * scale)  # More stable with f16 than dividing afterwards
-        weight = th.softmax(weight.float(), dim=-1).type(weight.dtype)
-        a = th.einsum("bts,bcs->bct", weight, v)
-        return a.reshape(bs, -1, length)
+        q, k, v = qkv.reshape(bs * self.n_heads, ch * 3, length).split(ch, dim=1)
+        # Reshape to (bs, n_heads, length, ch) for scaled_dot_product_attention
+        q = q.reshape(bs, self.n_heads, ch, length).permute(0, 1, 3, 2)
+        k = k.reshape(bs, self.n_heads, ch, length).permute(0, 1, 3, 2)
+        v = v.reshape(bs, self.n_heads, ch, length).permute(0, 1, 3, 2)
+        a = F.scaled_dot_product_attention(q, k, v)
+        return a.permute(0, 1, 3, 2).reshape(bs, -1, length)
 
     @staticmethod
     def count_flops(model, _x, y):
@@ -529,16 +527,12 @@ class QKVAttention(nn.Module):
         assert width % (3 * self.n_heads) == 0
         ch = width // (3 * self.n_heads)
         q, k, v = qkv.chunk(3, dim=1)
-        scale = 1 / math.sqrt(math.sqrt(ch))
-        weight = th.einsum(
-            "bct,bcs->bts",
-            (q * scale).view(bs * self.n_heads, ch, length),
-            (k * scale).view(bs * self.n_heads, ch, length),
-        )  # More stable with f16 than dividing afterwards
-        weight = th.softmax(weight.float(), dim=-1).type(weight.dtype)
-        a = th.einsum("bts,bcs->bct", weight,
-                      v.reshape(bs * self.n_heads, ch, length))
-        return a.reshape(bs, -1, length)
+        # Reshape to (bs, n_heads, length, ch) for scaled_dot_product_attention
+        q = q.view(bs, self.n_heads, ch, length).permute(0, 1, 3, 2)
+        k = k.view(bs, self.n_heads, ch, length).permute(0, 1, 3, 2)
+        v = v.view(bs, self.n_heads, ch, length).permute(0, 1, 3, 2)
+        a = F.scaled_dot_product_attention(q, k, v)
+        return a.permute(0, 1, 3, 2).reshape(bs, -1, length)
 
     @staticmethod
     def count_flops(model, _x, y):

@@ -425,7 +425,7 @@
     </a>
     <nav class="site-nav" aria-label="Page sections">
       <a href="#overview">Overview</a>
-      <a href="#pipelines">Pipelines</a>
+      <a href="#attention">Attention</a>
       <a href="#alignment">Alignment</a>
       <a href="#install">Install</a>
       <a href="#quickstart">Quick start</a>
@@ -481,7 +481,7 @@
         <div class="stat"><div class="num">200+</div><div class="label">registered model IDs</div></div>
         <div class="stat"><div class="num">10+</div><div class="label">tokenizer families</div></div>
         <div class="stat"><div class="num">11</div><div class="label">generator families</div></div>
-        <div class="stat"><div class="num">3</div><div class="label">pipeline types</div></div>
+        <div class="stat"><div class="num">3</div><div class="label">SDPA backends</div></div>
         <div class="stat"><div class="num">3</div><div class="label">alignment targets<br><small style="font-size:0.75rem;opacity:0.75">DINOv2 · MAE · BiomedCLIP</small></div></div>
         <div class="stat"><div class="num">2D+3D</div><div class="label">same API</div></div>
       </div>
@@ -513,54 +513,71 @@
       </div>
     </section>
 
-    <!-- ── PIPELINES ─────────────────────────────────────────────────────── -->
-    <section class="block" id="pipelines" aria-labelledby="h-pipelines">
-      <h2 id="h-pipelines">Three pipeline types</h2>
-      <p style="color:var(--muted);margin-top:0;max-width:65ch">
-        <code>GenWrapper</code> detects the tokenizer and generator type and selects the right encode/decode path automatically.
-        There are three supported combinations:
+    <!-- ── ATTENTION ──────────────────────────────────────────────────────── -->
+    <section class="block" id="attention" aria-labelledby="h-attention">
+      <h2 id="h-attention">Attention mechanisms &amp; PyTorch backends</h2>
+      <p style="color:var(--muted);margin-top:0;max-width:68ch">
+        Every model in MedLat uses <code>torch.nn.functional.scaled_dot_product_attention</code> (SDPA).
+        PyTorch selects the most efficient kernel automatically — but you can override it.
       </p>
 
-      <h4>① Continuous tokenizer + Diffusion generator</h4>
-      <div class="compat-row">
-        <span class="tag-sm tag-cont">AEKL · VAVAE · MedVAE · DCAE</span>
-        <span class="arrow">→</span>
-        <span class="tag-sm tag-gen">DiT · MDT · UViT · LDM · ADM</span>
+      <div class="grid-2" style="margin-bottom:1.5rem">
+        <div class="card">
+          <strong style="color:var(--med)">FlashAttention</strong>
+          <p style="margin:0.4rem 0 0;color:var(--muted);font-size:0.95rem">Fastest; O(N) memory. Requires CUDA, fp16/bf16, head-dim ≤ 128. Not supported for float additive masks (MDT relative-position bias).</p>
+        </div>
+        <div class="card">
+          <strong style="color:var(--lad-warm)">Memory-efficient attention</strong>
+          <p style="margin:0.4rem 0 0;color:var(--muted);font-size:0.95rem">CUDA, handles most dtypes and mask types including float additive bias. Good fallback when FlashAttention is unavailable.</p>
+        </div>
+        <div class="card">
+          <strong style="color:var(--accent-2)">Math (unfused)</strong>
+          <p style="margin:0.4rem 0 0;color:var(--muted);font-size:0.95rem">Universal fallback — CPU, any dtype, any mask. Slower and higher memory, but always works.</p>
+        </div>
       </div>
-      <pre class="code" tabindex="0"><span class="c"># z is (B, C, H, W) continuous latents</span>
-z = wrapper.vae_encode(images)
-terms = diffusion.training_losses(wrapper, z, t, model_kwargs=<span class="s">{'y': labels}</span>)
-loss  = terms[<span class="s">'loss'</span>].mean()</pre>
 
-      <h4>② Continuous tokenizer + Continuous AR generator</h4>
-      <div class="compat-row">
-        <span class="tag-sm tag-cont">AEKL · VAVAE · MedVAE</span>
-        <span class="arrow">→</span>
-        <span class="tag-sm tag-ar">MAR · RAR</span>
+      <h4>Default behaviour</h4>
+      <p style="color:var(--muted);margin:0 0 0.75rem;max-width:65ch;font-size:0.95rem">
+        By default PyTorch auto-selects the best available backend. On a CUDA device with fp16/bf16 this is FlashAttention; on CPU it falls back to math.
+      </p>
+
+      <h4>Selecting a backend — PyTorch ≥ 2.3</h4>
+      <pre class="code" tabindex="0"><span class="c"># preferred API (PyTorch ≥ 2.3)</span>
+from torch.nn.attention import sdpa_kernel, SDPBackend
+
+<span class="c"># FlashAttention only</span>
+with sdpa_kernel(SDPBackend.FLASH_ATTENTION):
+    output = model(x)
+
+<span class="c"># Memory-efficient only</span>
+with sdpa_kernel(SDPBackend.EFFICIENT_ATTENTION):
+    output = model(x)
+
+<span class="c"># Math (unfused) — always available</span>
+with sdpa_kernel(SDPBackend.MATH):
+    output = model(x)</pre>
+
+      <h4>Selecting a backend — PyTorch 2.0 / 2.1</h4>
+      <pre class="code" tabindex="0"><span class="c"># legacy API (PyTorch 2.0 / 2.1)</span>
+with torch.backends.cuda.sdp_kernel(
+    enable_flash=True, enable_math=False, enable_mem_efficient=False
+):
+    output = model(x)  <span class="c"># FlashAttention</span>
+
+<span class="c"># Disable FlashAttention entirely (useful for debugging or float masks)</span>
+torch.backends.cuda.enable_flash_sdp(False)
+print(torch.backends.cuda.flash_sdp_enabled())  <span class="c"># False</span></pre>
+
+      <h4>Per-model notes</h4>
+      <div class="card" style="margin-bottom:0">
+        <ul style="margin:0;padding-left:1.2rem;color:var(--muted);font-size:0.95rem;line-height:1.8">
+          <li><strong style="color:var(--text)">MDT</strong> — passes a float additive relative-position bias as <code>attn_mask</code>. FlashAttention does not support float masks; PyTorch automatically falls back to memory-efficient or math.</li>
+          <li><strong style="color:var(--text)">Taming GPT</strong> — uses <code>is_causal=True</code> during training and <code>is_causal=False</code> for KV-cache inference (when <code>layer_past</code> is supplied).</li>
+          <li><strong style="color:var(--text)">VMAE</strong> — SDPA is used by default; when <code>return_attn_map=True</code> is requested the model falls back to manual attention to expose the intermediate attention weights.</li>
+          <li><strong style="color:var(--text)">UViT / TiTok</strong> — use an <code>ATTENTION_MODE</code> flag; SDPA is the default mode and requires no further configuration.</li>
+          <li><strong style="color:var(--text)">Muse Attend</strong> — applies a non-standard scale (<code>scale=8</code>) for RMSNorm-ed queries/keys; this is forwarded directly to SDPA via the <code>scale=</code> argument.</li>
+        </ul>
       </div>
-      <pre class="code" tabindex="0"><span class="c"># MAR: wrapper(z, y=labels) directly</span>
-z    = wrapper.vae_encode(images)          <span class="c"># (B, C, H, W)</span>
-loss = wrapper(z, y=labels)
-
-<span class="c"># RAR: reshape to sequence first</span>
-B, C, H, W = z.shape
-z_flat = z.permute(<span class="s">0,2,3,1</span>).reshape(B, H*W, C)  <span class="c"># (B, seq, C)</span>
-loss   = wrapper.generator(z_flat, labels)</pre>
-
-      <h4>③ Discrete tokenizer + Discrete AR generator</h4>
-      <div class="compat-row">
-        <span class="tag-sm tag-disc">VQ · LFQ · BSQ · FSQ · SimVQ · RQVAE</span>
-        <span class="arrow">→</span>
-        <span class="tag-sm tag-ar">MaskGIT · MAGE · Taming GPT · MaskBit</span>
-      </div>
-      <pre class="code" tabindex="0"><span class="c"># z is (B, seq_len) discrete token indices</span>
-z    = wrapper.vae_encode(images)
-<span class="c"># MaskGIT:</span>
-loss = wrapper(z, y=labels)
-<span class="c"># MAGE (suffix in name must match vae_stride):</span>
-loss, _, _ = wrapper(z, labels)
-<span class="c"># Taming GPT (autoregressive next-token):</span>
-_, loss = wrapper.generator(z[:, :-<span class="s">1</span>], targets=z[:, <span class="s">1</span>:])</pre>
     </section>
 
     <!-- ── SPATIAL ───────────────────────────────────────────────────────── -->

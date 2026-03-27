@@ -2,6 +2,7 @@ from functools import partial
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from timm.models.vision_transformer import DropPath, Mlp
 
@@ -42,17 +43,14 @@ class Attention(nn.Module):
         qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
         q, k, v = qkv[0], qkv[1], qkv[2]   # make torchscript happy (cannot use tensor as tuple)
 
-        with torch.amp.autocast('cuda', enabled=False):
-            attn = (q.float() @ k.float().transpose(-2, -1)) * self.scale
-
-        attn = attn - torch.max(attn, dim=-1, keepdim=True)[0]
-        attn = attn.softmax(dim=-1)
-        attn = self.attn_drop(attn)
-
-        x = (attn @ v).transpose(1, 2).reshape(B, N, C)
+        x = F.scaled_dot_product_attention(
+            q, k, v,
+            dropout_p=self.attn_drop.p if self.training else 0.0,
+        )
+        x = x.transpose(1, 2).reshape(B, N, C)
         x = self.proj(x)
         x = self.proj_drop(x)
-        return x, attn
+        return x, None
 
 
 class Block(nn.Module):

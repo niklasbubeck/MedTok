@@ -235,7 +235,7 @@ class Attention(nn.Module):
         keys = keys.repeat_interleave(self.n_head // self.n_kv_head, dim=1)
         values = values.repeat_interleave(self.n_head // self.n_kv_head, dim=1)
 
-        output = scaled_dot_product_attention(
+        output = F.scaled_dot_product_attention(
             xq, keys, values,
             attn_mask=mask,
             is_causal=True if mask is None else False,  # is_causal=False is for KV cache

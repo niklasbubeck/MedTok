@@ -96,21 +96,82 @@ generator = get_model("mar.b",
 
 ---
 
-## Compatible pipelines at a glance
+## Attention mechanisms & PyTorch backends
 
-`GenWrapper` routes encode/decode automatically. The three supported pipeline types are:
+Every attention module in MedLat uses [`torch.nn.functional.scaled_dot_product_attention`](https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html) (SDPA), available since PyTorch 2.0. PyTorch automatically selects the most efficient kernel at runtime:
 
-| First stage | Generator | Training call | Notes |
-|-------------|-----------|---------------|-------|
-| Continuous VAE | **DiT / MDT / UViT** (diffusion) | `diffusion.training_losses(wrapper, z, t, model_kwargs)` | `z` is `(B, C, H, W)` |
-| Continuous VAE | **MAR** (masked continuous AR) | `wrapper(z, y=labels)` | `z` is `(B, C, H, W)` |
-| Continuous VAE | **RAR** (recurrent continuous AR) | `wrapper.generator(z_flat, labels)` | reshape `z` → `(B, seq, C)` first |
-| Discrete VAE | **MaskGIT** (masked token) | `wrapper(z, y=labels)` | `z` is `(B, seq_len)` indices |
-| Discrete VAE | **MAGE** (masked ViT generator) | `wrapper(z, labels)` | vae_stride must match MAGE patch size |
-| Discrete VAE | **Taming GPT** (autoregressive) | `wrapper.generator(z[:, :-1], targets=z[:, 1:])` | next-token prediction |
-| Discrete VAE | **MaskBit** (BERT-style masked) | custom masked loop | uses `LFQBert` or `Bert` |
+| Backend | When selected | Notes |
+|---------|--------------|-------|
+| **FlashAttention** | CUDA, supported GPU, no custom float mask | Fastest; fused kernel, O(N) memory |
+| **Memory-efficient attention** | CUDA, arbitrary masks | Slower than flash but handles masks well |
+| **Math (unfused)** | CPU or unsupported GPU | Numerically identical reference path |
 
-See `example_generator_*.ipynb` for complete runnable examples of each pipeline.
+### Default behaviour
+
+No configuration needed. On a CUDA-capable GPU MedLat will automatically use FlashAttention (where supported) or memory-efficient attention. On CPU it falls back to the standard unfused path.
+
+```python
+import torch
+from medlat import get_model
+
+model = get_model("dit.xl_2", img_size=256, vae_stride=8, in_channels=16).cuda()
+# PyTorch picks the best kernel automatically — nothing else required.
+```
+
+### Explicitly choosing a backend
+
+Use PyTorch's context managers to pin a specific kernel, e.g. for profiling, debugging or benchmarking:
+
+```python
+import torch
+
+# PyTorch ≥ 2.3 — preferred API
+from torch.nn.attention import sdpa_kernel, SDPBackend
+
+with sdpa_kernel(SDPBackend.FLASH_ATTENTION):
+    loss = model(x, t, y)
+
+with sdpa_kernel(SDPBackend.EFFICIENT_ATTENTION):
+    loss = model(x, t, y)
+
+with sdpa_kernel(SDPBackend.MATH):
+    loss = model(x, t, y)
+
+# PyTorch 2.0 / 2.1 — lower-level flag API
+with torch.backends.cuda.sdp_kernel(
+    enable_flash=True, enable_math=False, enable_mem_efficient=False
+):
+    loss = model(x, t, y)
+```
+
+### Disabling FlashAttention globally
+
+If your GPU does not support FlashAttention or you want to force the memory-efficient path:
+
+```python
+from torch.nn.attention import sdpa_kernel, SDPBackend
+
+with sdpa_kernel([SDPBackend.EFFICIENT_ATTENTION, SDPBackend.MATH]):
+    output = model(x, t, y)
+```
+
+### Verifying which kernel is active
+
+```python
+import torch
+
+# Print which backends PyTorch considers available on the current device
+print(torch.backends.cuda.flash_sdp_enabled())           # True if FlashAttention eligible
+print(torch.backends.cuda.mem_efficient_sdp_enabled())   # True if mem-efficient eligible
+print(torch.backends.cuda.math_sdp_enabled())            # always True
+```
+
+### Notes on specific model families
+
+- **MDT** — passes the relative position bias as the `attn_mask` argument; PyTorch routes this through the memory-efficient or math backend (FlashAttention does not support float additive masks).
+- **Taming GPT** — uses `is_causal=True` during training and `is_causal=False` during cached inference; FlashAttention handles both paths natively.
+- **VMAE** — when `return_attn_map=True` is requested (e.g. for visualisation), falls back to the manual `q @ k.T` path so that the full attention matrix is available. SDPA is used for all normal training/inference calls.
+- **UViT** — detects at import time whether SDPA is available and sets `ATTENTION_MODE` accordingly; falls back to xformers or math if not.
 
 ---
 

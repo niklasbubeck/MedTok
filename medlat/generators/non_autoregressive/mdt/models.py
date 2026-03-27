@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import numpy as np
 import math
 from timm.models.vision_transformer import Mlp
@@ -46,16 +47,18 @@ class Attention(nn.Module):
         # make torchscript happy (cannot use tensor as tuple)
         q, k, v = qkv[0], qkv[1], qkv[2]
 
-        attn = (q @ k.transpose(-2, -1)) * self.scale
         if ids_keep is not None:
             rp_bias = self.get_masked_rel_bias(B, ids_keep)
         else:
             rp_bias = self.rel_pos_bias()
-        attn += rp_bias
-        attn = attn.softmax(dim=-1)
-        attn = self.attn_drop(attn)
 
-        x = (attn @ v).transpose(1, 2).reshape(B, N, C)
+        x = F.scaled_dot_product_attention(
+            q, k, v,
+            attn_mask=rp_bias,
+            dropout_p=self.attn_drop.p if self.training else 0.0,
+            scale=self.scale,
+        )
+        x = x.transpose(1, 2).reshape(B, N, C)
         x = self.proj(x)
         x = self.proj_drop(x)
         return x

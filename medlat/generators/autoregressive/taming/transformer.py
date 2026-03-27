@@ -47,13 +47,11 @@ class CausalSelfAttention(nn.Module):
             k = torch.cat((past_key, k), dim=-2)
             v = torch.cat((past_value, v), dim=-2)
 
-        att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))
-        if layer_past is None:
-            att = att.masked_fill(self.mask[:, :, :T, :T] == 0, float('-inf'))
-
-        att = F.softmax(att, dim=-1)
-        att = self.attn_drop(att)
-        y = att @ v
+        y = F.scaled_dot_product_attention(
+            q, k, v,
+            dropout_p=self.attn_drop.p if self.training else 0.0,
+            is_causal=(layer_past is None),
+        )
         y = y.transpose(1, 2).contiguous().view(B, T, C)
         y = self.resid_drop(self.proj(y))
         return y, present
