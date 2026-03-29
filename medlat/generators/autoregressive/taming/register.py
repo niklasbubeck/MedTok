@@ -1,6 +1,8 @@
 from medlat.registry import register_model
 from .transformer import GPT_B, GPT_L, GPT_H
 
+__all__ = []
+
 
 @register_model("taming.gpt_b")
 def taming_gpt_b(**kwargs):

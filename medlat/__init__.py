@@ -10,6 +10,15 @@ from .registry import (
     register_model,
 )
 from .utils import validate_compatibility
+from .base import (
+    FirstStageModel,
+    ContinuousFirstStage,
+    DiscreteFirstStage,
+    TokenFirstStage,
+    GeneratorModel,
+    AutoregressiveGenerator,
+    NonAutoregressiveGenerator,
+)
 
 __all__ = [
     "MODEL_REGISTRY",
@@ -20,4 +29,11 @@ __all__ = [
     "register_model",
     "GenWrapper",
     "validate_compatibility",
+    "FirstStageModel",
+    "ContinuousFirstStage",
+    "DiscreteFirstStage",
+    "TokenFirstStage",
+    "GeneratorModel",
+    "AutoregressiveGenerator",
+    "NonAutoregressiveGenerator",
 ]

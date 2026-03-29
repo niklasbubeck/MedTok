@@ -4,6 +4,8 @@ from medlat.utils import instantiate_from_config
 from .unet import UNetModel as ADM
 from .unet import EncoderUNetModel as ADM_classifier
 
+__all__ = []
+
 """
 Optimized configs for ADM diffusion and classifier models.
 Models are now registered with method-based configurations.

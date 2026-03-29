@@ -1,8 +1,10 @@
-import torch 
+import torch
 import torch.nn as nn
 from medlat.registry import register_model
 from .transformer import MaskGIT
 from functools import partial
+
+__all__ = []
 
 
 @register_model("maskgit.b")

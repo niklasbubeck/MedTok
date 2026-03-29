@@ -3,6 +3,8 @@ from medlat.first_stage.continuous.modules.maisi_modules import MaisiEncoder, Ma
 from medlat.first_stage.continuous.modules.dcae_modules.dcae_modules import DCAEEncoder, DCAEDecoder
 from medlat.registry import register_model
 from medlat.first_stage.continuous.vae_models import AutoencoderKL, AutoencoderKLTransformer
+
+__all__ = []
 from medlat.modules.alignments import *
 from medlat.modules.vit_core import GenericViTEncoder, GenericViTDecoder
 
@@ -469,7 +471,6 @@ def DCAE_f32c32(
     return AutoencoderKL(
         encoder=encoder,
         decoder=decoder,
-        use_quant_conv=use_quant_conv,
         double_z=double_z,
         **kwargs,
     )
@@ -526,10 +527,9 @@ def DCAE_f64c128(
         img_size=img_size,
     )
     return AutoencoderKL(
-        encoder=encoder, 
+        encoder=encoder,
         decoder=decoder,
         double_z=double_z,
-        use_quant_conv=use_quant_conv,
         **kwargs,
     )
 
@@ -588,7 +588,6 @@ def DCAE_f128c512(
         encoder=encoder,
         decoder=decoder,
         double_z=double_z,
-        use_quant_conv=use_quant_conv,
         **kwargs,
     )
 

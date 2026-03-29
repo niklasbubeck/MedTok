@@ -1,7 +1,9 @@
-import torch 
+import torch
 import torch.nn as nn
 from medlat.registry import register_model
 from medlat.first_stage.discrete.modules.ldm_modules import Encoder, Decoder
+
+__all__ = []
 from einops.layers.torch import Rearrange, Reduce
 from medlat.first_stage.discrete.vq_models import VQModel, VQModelTransformer
 from medlat.first_stage.discrete.quantizer import *

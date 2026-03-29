@@ -1,6 +1,8 @@
 from medlat.registry import register_model
 from .rardiff import RAR_B, RAR_L, RAR_XL, RAR_H
 
+__all__ = []
+
 
 @register_model("rar.b")
 def rar_b(**kwargs):

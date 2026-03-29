@@ -1,6 +1,8 @@
 import torch
 from medlat.registry import register_model
 from .titok.titok import TiTok
+
+__all__ = []
 from .maetok.modules.vit_models import MAETokViTEncoder, MAETokViTDecoder
 from .maetok.maetok import MaskAEModel
 

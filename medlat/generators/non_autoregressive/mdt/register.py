@@ -4,6 +4,8 @@ from .models import (
     MDTv2_XL_4, MDTv2_L_4, MDTv2_B_4, MDTv2_S_4,
 )
 
+__all__ = []
+
 
 @register_model("mdt.xl_2")
 def mdt_xl_2(**kwargs):

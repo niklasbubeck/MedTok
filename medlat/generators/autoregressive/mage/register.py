@@ -6,6 +6,8 @@ from .mage import (
     MAGE_ViT_L_4,  MAGE_ViT_L_8,  MAGE_ViT_L_16,
 )
 
+__all__ = []
+
 
 @register_model("mage.xs_4")
 def mage_xs_4(**kwargs):

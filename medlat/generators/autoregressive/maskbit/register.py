@@ -1,6 +1,8 @@
 from medlat.registry import register_model
 from .maskbit import LFQBert, Bert
 
+__all__ = []
+
 
 @register_model("maskbit.s")
 def maskbit_s(**kwargs):

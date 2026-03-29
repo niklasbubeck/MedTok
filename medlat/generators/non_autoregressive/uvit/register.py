@@ -3,6 +3,8 @@ from .models import (
     U_ViT_Small, U_ViT_Small_Deep, U_ViT_Mid, U_ViT_Large, U_ViT_Huge,
 )
 
+__all__ = []
+
 
 @register_model("uvit.small")
 def uvit_small(**kwargs):

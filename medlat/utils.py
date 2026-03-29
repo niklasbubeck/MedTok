@@ -11,19 +11,36 @@ logger = logging.getLogger(__name__)
 
 
 def get_model_type(model: nn.Module) -> Literal["continuous", "discrete", "token", "autoregressive", "non-autoregressive"]:
+    from medlat.base import (
+        ContinuousFirstStage, DiscreteFirstStage, TokenFirstStage,
+        AutoregressiveGenerator, NonAutoregressiveGenerator,
+    )
+    if isinstance(model, ContinuousFirstStage):
+        return "continuous"
+    if isinstance(model, DiscreteFirstStage):
+        return "discrete"
+    if isinstance(model, TokenFirstStage):
+        return "token"
+    if isinstance(model, AutoregressiveGenerator):
+        return "autoregressive"
+    if isinstance(model, NonAutoregressiveGenerator):
+        return "non-autoregressive"
+    # Fallback: legacy string-matching for models not yet migrated
     module_path = model.__class__.__module__
     if "first_stage.continuous" in module_path:
         return "continuous"
-    elif "first_stage.discrete" in module_path:
+    if "first_stage.discrete" in module_path:
         return "discrete"
-    elif "first_stage.token" in module_path:
+    if "first_stage.token" in module_path:
         return "token"
-    elif "generators.autoregressive" in module_path:
+    if "generators.autoregressive" in module_path:
         return "autoregressive"
-    elif "generators.non_autoregressive" in module_path:
+    if "generators.non_autoregressive" in module_path:
         return "non-autoregressive"
-    else:
-        raise ValueError(f"Unknown model type: {module_path}")
+    raise ValueError(
+        f"Cannot determine model type for {model.__class__.__qualname__}. "
+        f"Inherit from one of the base classes in medlat.base."
+    )
 
 from typing import Any
 import hashlib

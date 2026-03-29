@@ -6,6 +6,8 @@ from medlat.utils import init_from_ckpt, get_model_type
 
 logger = logging.getLogger(__name__)
 
+__all__ = ["GenWrapper"]
+
 
 class GenWrapper(nn.Module):
     def __init__(
@@ -43,19 +45,22 @@ class GenWrapper(nn.Module):
         else:
             raise ValueError(f"Unsupported combination of generator and first stage types: {self.generator_type} and {self.first_stage_type}")
 
+        self._validate_at_construction()
+
         # Determine if we should do automatic scale_factor estimation
         self._auto_scale_factor = scale_factor is None
-        
+
         # Register scale factor as buffer
         # If None, initialize to 1.0 (will be updated automatically)
         # If provided, use the given value (will not be updated)
         initial_scale = 1.0 if scale_factor is None else scale_factor
         self.register_buffer("scale_factor", torch.tensor(initial_scale))
-        
+
         # Track step counter and running statistics for automatic scale_factor determination
         # Only used when _auto_scale_factor is True
         self._scale_step_counter = 0
-        self._running_std_sum = 0.0
+        self.register_buffer("_running_std_sum", torch.tensor(0.0))
+        self.register_buffer("_running_std_count", torch.tensor(0))
 
         if ckpt_path is not None:
             init_from_ckpt(self, ckpt_path)
@@ -65,6 +70,40 @@ class GenWrapper(nn.Module):
             for p in self.first_stage.parameters():
                 p.requires_grad = False
             self.first_stage.eval()
+
+    # ---------------------------------------------------------------------
+    # Validation
+    # ---------------------------------------------------------------------
+    def _validate_at_construction(self):
+        fs_type = self.first_stage_type
+        gen_type = self.generator_type
+
+        # Check required attrs on first stage
+        if fs_type == "continuous":
+            if not hasattr(self.first_stage, "embed_dim"):
+                raise AttributeError(
+                    f"{self.first_stage.__class__.__name__} must have an 'embed_dim' attribute "
+                    f"(number of latent channels). Ensure it inherits from ContinuousFirstStage."
+                )
+        elif fs_type == "discrete":
+            for attr in ("n_embed", "embed_dim"):
+                if not hasattr(self.first_stage, attr):
+                    raise AttributeError(
+                        f"{self.first_stage.__class__.__name__} must have a '{attr}' attribute. "
+                        f"Ensure it inherits from DiscreteFirstStage."
+                    )
+
+        # Check generator compatibility
+        if gen_type == "non-autoregressive":
+            if not hasattr(self.generator, "in_channels"):
+                raise AttributeError(
+                    f"{self.generator.__class__.__name__} must have an 'in_channels' attribute."
+                )
+        elif gen_type == "autoregressive" and fs_type == "discrete":
+            if not hasattr(self.generator, "codebook_size") and not hasattr(self.generator, "num_tokens"):
+                raise AttributeError(
+                    f"{self.generator.__class__.__name__} must have a 'codebook_size' or 'num_tokens' attribute."
+                )
 
     # ---------------------------------------------------------------------
     # Training mode handling
@@ -93,26 +132,28 @@ class GenWrapper(nn.Module):
         # Only do automatic estimation if scale_factor was None
         if not self._auto_scale_factor:
             return
-        
-        if self._scale_step_counter > self.scale_steps:
-            return
-        
-        if self._scale_step_counter == self.scale_steps:
+
+        if not self.training:
+            return  # Don't mutate scale factor in eval mode
+
+        if self._scale_step_counter >= self.scale_steps:
+            return  # Already frozen
+
+        if self._scale_step_counter == self.scale_steps - 1:
             logger.info(f"Scale factor fixed at {self.scale_factor.item()}")
-            self._scale_step_counter +=1
-            return
-        
+
         with torch.no_grad():
             # Compute standard deviation of quantized latents
-            quant_std = quant.std().item()
-            
-            # Accumulate std values
+            quant_std = quant.std()
+
+            # Accumulate std values using registered buffers
             self._running_std_sum += quant_std
+            self._running_std_count += 1
             self._scale_step_counter += 1
-            
+
             # Compute average std and update scale_factor
-            avg_std = self._running_std_sum / self._scale_step_counter
-            self.scale_factor.data = torch.tensor(1.0 / (avg_std + 1e-8), device=self.scale_factor.device)
+            avg_std = self._running_std_sum / self._running_std_count
+            self.scale_factor.data = torch.tensor(1.0 / (avg_std.item() + 1e-8), device=self.scale_factor.device)
 
     # ---------------------------------------------------------------------
     # Encoding
@@ -120,10 +161,9 @@ class GenWrapper(nn.Module):
     def vae_encode(self, image: torch.Tensor, sample: bool = True) -> torch.Tensor:
         if self.first_stage is None:
             return image
-        
-        quant, loss, info = self.fcn_encode(image)
-        self.quant_shape = quant.permute(0, 2, 3, 1).shape  # (B, H, W, C) for indices decoding later
 
+        quant, loss, info = self.fcn_encode(image)
+        self._quant_shape = quant.permute(0, 2, 3, 1).shape  # (B, H, W, C) for indices decoding later
 
         # Automatically determine scale_factor during the first scale_steps steps
         if self.training:
@@ -135,23 +175,28 @@ class GenWrapper(nn.Module):
             return quant
         else:
             _, _, indices = info
-            if type(indices) == torch.Tensor: ## normal
+            if type(indices) == torch.Tensor:  # normal
                 return indices.reshape(image.shape[0], -1)
             elif isinstance(indices, (list, tuple)):  # residual quantizer
                 indices = [ind.reshape(image.shape[0], -1) for ind in indices]
                 return torch.cat(indices, dim=1)
             return quant
 
-
     # ---------------------------------------------------------------------
     # Decoding
     # ---------------------------------------------------------------------
-    def vae_decode(self, z: torch.Tensor, out_shape = None) -> torch.Tensor:
+    def vae_decode(self, z: torch.Tensor, out_shape=None) -> torch.Tensor:
         if self.first_stage is None:
             return z
-        
+
         if self.generator_type == "autoregressive" and self.first_stage_type == "discrete":
-            return self.fcn_decode(z, out_shape=out_shape if out_shape is not None else self.quant_shape)
+            if out_shape is None and not hasattr(self, "_quant_shape"):
+                raise RuntimeError(
+                    "vae_decode() with discrete autoregressive routing requires a prior call to "
+                    "vae_encode() to establish the quantization shape. "
+                    "Call vae_encode() at least once before vae_decode()."
+                )
+            return self.fcn_decode(z, out_shape=out_shape if out_shape is not None else self._quant_shape)
         else:
             return self.fcn_decode(z / self.scale_factor)
 

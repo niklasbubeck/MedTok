@@ -1,6 +1,8 @@
 from .openaimodel import UNetModel
 from medlat.registry import register_model
 
+__all__ = []
+
 """
 Model configurations as taken from Table 14 in the paper
 """

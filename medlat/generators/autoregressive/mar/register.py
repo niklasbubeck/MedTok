@@ -1,8 +1,10 @@
-import torch 
+import torch
 import torch.nn as nn
 from functools import partial
 
 from medlat.registry import register_model
+
+__all__ = []
 from .mar import MAR
 
 @register_model("mar.b")

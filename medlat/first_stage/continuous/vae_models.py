@@ -8,6 +8,7 @@ logger = logging.getLogger(__name__)
 from medlat.modules.alignments import AlignmentModule
 from medlat.first_stage.continuous.modules.ldm_modules import get_conv_layer
 from medlat.first_stage.modules.gaussian_dist import DiagonalGaussianDistribution, _DeterministicPosterior
+from medlat.base import ContinuousFirstStage
 
 __all__ = [
     "AutoencoderKL",
@@ -15,7 +16,7 @@ __all__ = [
 ]
 
 
-class AutoencoderKL(nn.Module):
+class AutoencoderKL(ContinuousFirstStage):
     def __init__(self,
                  encoder: nn.Module,
                  decoder: nn.Module,
@@ -27,7 +28,7 @@ class AutoencoderKL(nn.Module):
                  channel_dim: int = 1,      # B, C, H, W --> 1 | B, N, C --> 2
                  ckpt_path: str = None):
         super().__init__()
-        
+
         if pre_post_layer == "conv":
             self.dims = getattr(encoder, "dims", 2)
             conv_layer = get_conv_layer(self.dims)
@@ -42,20 +43,20 @@ class AutoencoderKL(nn.Module):
         if self.encoder_z_channels is None:
             raise ValueError(f"Encoder {encoder.__class__.__name__} must define z_channels.")
 
-        self.vae_stride = getattr(encoder, "vae_stride", None)
-        if self.vae_stride is None:
+        self._vae_stride = getattr(encoder, "vae_stride", None)
+        if self._vae_stride is None:
             raise ValueError(f"Encoder {encoder.__class__.__name__} must define vae_stride.")
 
         self.kl_weight = kl_weight
         if embed_dim is None:
             embed_dim = self.encoder_z_channels
-        self.embed_dim = embed_dim
+        self._embed_dim = embed_dim
 
         if pre_post_layer == "conv":
             self.quant_conv = conv_layer(2 * self.encoder_z_channels, 2 * embed_dim, 1)
             self.post_quant_conv = conv_layer(embed_dim, self.encoder_z_channels, 1)
         elif pre_post_layer == "linear":
-            self.quant_conv = nn.Linear(2 * self.encoder_z_channels, 2 * embed_dim) 
+            self.quant_conv = nn.Linear(2 * self.encoder_z_channels, 2 * embed_dim)
             self.post_quant_conv = nn.Linear(embed_dim, self.encoder_z_channels)
         elif pre_post_layer == "none":
             self.quant_conv = nn.Identity()
@@ -65,6 +66,14 @@ class AutoencoderKL(nn.Module):
 
         if ckpt_path is not None:
             init_from_ckpt(self, ckpt_path)
+
+    @property
+    def vae_stride(self):
+        return self._vae_stride
+
+    @property
+    def embed_dim(self):
+        return self._embed_dim
 
 
     def get_posterior(self, x):
@@ -119,7 +128,7 @@ class AutoencoderKL(nn.Module):
 
 
 
-class AutoencoderKLTransformer(nn.Module):
+class AutoencoderKLTransformer(ContinuousFirstStage):
     def __init__(self,
                  encoder: nn.Module,
                  decoder: nn.Module,
@@ -142,17 +151,17 @@ class AutoencoderKLTransformer(nn.Module):
         if self.encoder_z_channels is None:
             raise ValueError(f"Encoder {encoder.__class__.__name__} must define z_channels.")
 
-        self.vae_stride = getattr(encoder, "vae_stride", None)
-        if self.vae_stride is None:
+        self._vae_stride = getattr(encoder, "vae_stride", None)
+        if self._vae_stride is None:
             raise ValueError(f"Encoder {encoder.__class__.__name__} must define vae_stride.")
 
         self.kl_weight = kl_weight
         if embed_dim is None:
             embed_dim = self.encoder_z_channels
-        self.embed_dim = embed_dim
+        self._embed_dim = embed_dim
 
         if pre_post_layer == "linear":
-            self.quant_conv = nn.Linear(2 * self.encoder_z_channels, 2 * embed_dim) 
+            self.quant_conv = nn.Linear(2 * self.encoder_z_channels, 2 * embed_dim)
             self.post_quant_conv = nn.Linear(embed_dim, self.encoder_z_channels)
         elif pre_post_layer == "none":
             self.quant_conv = nn.Identity()
@@ -163,6 +172,13 @@ class AutoencoderKLTransformer(nn.Module):
         if ckpt_path is not None:
             init_from_ckpt(self, ckpt_path)
 
+    @property
+    def vae_stride(self):
+        return self._vae_stride
+
+    @property
+    def embed_dim(self):
+        return self._embed_dim
 
     def get_posterior(self, x):
         h, aux = self.encoder(x)

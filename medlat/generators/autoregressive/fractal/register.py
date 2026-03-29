@@ -7,6 +7,8 @@ from .models import (
     FractalMAR_huge_in256,
 )
 
+__all__ = []
+
 
 @register_model("fractal.ar_64")
 def fractal_ar_64(**kwargs):

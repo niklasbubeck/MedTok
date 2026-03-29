@@ -1,7 +1,9 @@
-import torch 
+import torch
 import torch.nn as nn
 from medlat.registry import register_model
 from .models import DiT
+
+__all__ = []
 
 @register_model("dit.xl_1")
 def DiT_XL_1(**kwargs):

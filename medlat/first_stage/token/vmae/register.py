@@ -1,6 +1,8 @@
 from medlat.registry import register_model
 from .models import MaskedAutoencoderViT
 
+__all__ = []
+
 
 @register_model("token.vmae.t_p8_d16")
 def VMAE_T_P8_D16(**kwargs):
