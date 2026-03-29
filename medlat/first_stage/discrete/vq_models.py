@@ -23,8 +23,8 @@ class VQModel(DiscreteFirstStage):
         pre_post_layer="conv",
     ):
         super().__init__()
-        self.embed_dim = quantizer.e_dim
-        self.n_embed = quantizer.n_e
+        self._embed_dim = quantizer.e_dim
+        self._n_embed = quantizer.n_e
         self.dims = getattr(encoder, "dims", 2)
         self.encoder = encoder
         self.decoder = decoder
@@ -35,7 +35,7 @@ class VQModel(DiscreteFirstStage):
         if self.z_channels is None:
             raise ValueError(f"Encoder {encoder.__class__.__name__} must define z_channels.")
 
-        self.vae_stride = getattr(encoder, "vae_stride", None)
+        self._vae_stride = getattr(encoder, "vae_stride", None)
         if pre_post_layer == "conv":
             conv_layer = get_conv_layer(self.dims)
             self.quant_conv = conv_layer(self.z_channels, self.embed_dim, quant_conv_ks, stride=1, padding=quant_conv_ks//2)
@@ -47,8 +47,20 @@ class VQModel(DiscreteFirstStage):
             raise ValueError(f"Invalid pre_post_layer: {pre_post_layer}")
 
 
-        if ckpt_path is not None: 
+        if ckpt_path is not None:
             init_from_ckpt(self, ckpt_path)
+
+    @property
+    def vae_stride(self):
+        return self._vae_stride
+
+    @property
+    def embed_dim(self):
+        return self._embed_dim
+
+    @property
+    def n_embed(self):
+        return self._n_embed
 
     # def _check_msrq_features(self, method_name):
     #     if not self.quantizer.has_msrq_features:
@@ -175,8 +187,8 @@ class VQModelTransformer(DiscreteFirstStage):
         pre_post_layer="linear",
     ):
         super().__init__()
-        self.embed_dim = quantizer.e_dim
-        self.n_embed = quantizer.n_e
+        self._embed_dim = quantizer.e_dim
+        self._n_embed = quantizer.n_e
         self.dims = getattr(encoder, "dims", 2)
         self.encoder = encoder
         self.decoder = decoder
@@ -187,20 +199,30 @@ class VQModelTransformer(DiscreteFirstStage):
         if self.z_channels is None:
             raise ValueError(f"Encoder {encoder.__class__.__name__} must define z_channels.")
 
-        self.vae_stride = getattr(encoder, "vae_stride", None)
+        self._vae_stride = getattr(encoder, "vae_stride", None)
         if pre_post_layer == "linear":
-            self.quant_conv = nn.Linear(self.z_channels, self.embed_dim)
-            self.post_quant_conv = nn.Linear(self.embed_dim, self.z_channels)
+            self.quant_conv = nn.Linear(self.z_channels, self._embed_dim)
+            self.post_quant_conv = nn.Linear(self._embed_dim, self.z_channels)
         elif pre_post_layer == "none":
             self.quant_conv = nn.Identity()
             self.post_quant_conv = nn.Identity()
         else:
             raise ValueError(f"Invalid pre_post_layer: {pre_post_layer}")
 
-
-        if ckpt_path is not None: 
+        if ckpt_path is not None:
             init_from_ckpt(self, ckpt_path)
 
+    @property
+    def vae_stride(self):
+        return self._vae_stride
+
+    @property
+    def embed_dim(self):
+        return self._embed_dim
+
+    @property
+    def n_embed(self):
+        return self._n_embed
 
     def lock_parameters(self):
         """Lock the parameters of the model to prevent them from being updated during training."""
