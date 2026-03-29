@@ -6,10 +6,11 @@ from typing import Optional, Sequence, Union, List, Any, Dict, Tuple
 from medlat.first_stage.discrete.modules.ldm_modules import get_conv_layer
 from medlat.modules.alignments import AlignmentModule
 from einops import rearrange
+from medlat.base import DiscreteFirstStage
 __all__ = ["VQModel", "VQModelTransformer"]
 
 
-class VQModel(nn.Module):
+class VQModel(DiscreteFirstStage):
     def __init__(
         self,
         encoder: nn.Module,
@@ -163,7 +164,7 @@ class VQModel(nn.Module):
     #     return super().load_state_dict(state_dict=state_dict, strict=strict, assign=assign)
 
 
-class VQModelTransformer(nn.Module):
+class VQModelTransformer(DiscreteFirstStage):
     def __init__(
         self,
         encoder: nn.Module,

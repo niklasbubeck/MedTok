@@ -8,6 +8,7 @@ logger = logging.getLogger(__name__)
 from medlat.modules.alignments import AlignmentModule
 from medlat.first_stage.continuous.modules.ldm_modules import get_conv_layer
 from medlat.first_stage.modules.gaussian_dist import DiagonalGaussianDistribution, _DeterministicPosterior
+from medlat.base import ContinuousFirstStage
 
 __all__ = [
     "AutoencoderKL",
@@ -15,7 +16,7 @@ __all__ = [
 ]
 
 
-class AutoencoderKL(nn.Module):
+class AutoencoderKL(ContinuousFirstStage):
     def __init__(self,
                  encoder: nn.Module,
                  decoder: nn.Module,
@@ -119,7 +120,7 @@ class AutoencoderKL(nn.Module):
 
 
 
-class AutoencoderKLTransformer(nn.Module):
+class AutoencoderKLTransformer(ContinuousFirstStage):
     def __init__(self,
                  encoder: nn.Module,
                  decoder: nn.Module,
