@@ -4,7 +4,11 @@ All registered models should inherit from the appropriate base class.
 """
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import Any, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
+try:
+    from typing import Protocol, runtime_checkable
+except ImportError:
+    from typing_extensions import Protocol, runtime_checkable
 import torch
 import torch.nn as nn
 
@@ -16,7 +20,74 @@ __all__ = [
     "GeneratorModel",
     "AutoregressiveGenerator",
     "NonAutoregressiveGenerator",
+    "GenerativeScheduler",
 ]
+
+
+@runtime_checkable
+class GenerativeScheduler(Protocol):
+    """Protocol for generative noise schedulers (diffusion, flow matching, etc.).
+
+    Any class that implements ``training_losses`` and ``p_sample_loop`` with the
+    signatures below satisfies this protocol and can be used interchangeably via
+    ``create_scheduler()``.
+
+    Sampler tokens by paradigm
+    --------------------------
+    Gaussian diffusion (``create_scheduler("diffusion", ...)``):
+        ``sampler="ddpm"``  — stochastic ancestral sampling (default)
+        ``sampler="ddim"``  — deterministic DDIM; pass ``eta=0.0`` (fully
+                              deterministic) or ``eta>0`` to re-introduce noise
+
+    Flow matching (``create_scheduler("flow", ...)``):
+        ``sampler="dopri5"`` — adaptive Dormand-Prince ODE solver (default)
+        ``sampler="euler"``  — fixed-step Euler
+        ``sampler="heun"``   — fixed-step Heun (2nd-order)
+    """
+
+    def training_losses(
+        self,
+        model: Any,
+        x_start: torch.Tensor,
+        t: Optional[torch.Tensor] = None,
+        noise: Optional[torch.Tensor] = None,
+        model_kwargs: Optional[Dict] = None,
+    ) -> Dict[str, torch.Tensor]:
+        """Compute training loss for one batch.
+
+        Returns a dict that always contains ``"loss"`` and ``"mse"``.
+        Additional keys (e.g. ``"vb"``, ``"cos_loss"``) may be present
+        depending on the scheduler configuration.
+        """
+        ...
+
+    def p_sample_loop(
+        self,
+        model: Any,
+        shape: Tuple,
+        noise: Optional[torch.Tensor] = None,
+        model_kwargs: Optional[Dict] = None,
+        device: Optional[torch.device] = None,
+        progress: bool = False,
+        sampler: str = "default",
+    ) -> torch.Tensor:
+        """Generate a batch of samples from noise.
+
+        Args:
+            model: the generative model (nn.Module or callable).
+            shape: desired output shape, e.g. ``(B, C, H, W)``.
+            noise: optional starting noise tensor; drawn from N(0,I) if None.
+            model_kwargs: extra kwargs forwarded to the model (e.g. conditioning).
+            device: target device; inferred automatically if None.
+            progress: show a tqdm progress bar where supported.
+            sampler: sampler token (see class docstring for valid values per
+                paradigm). Extra sampler-specific kwargs can be passed as
+                ``**kwargs`` on concrete implementations.
+
+        Returns:
+            Tensor of shape ``shape`` containing the generated samples.
+        """
+        ...
 
 
 class FirstStageModel(nn.Module, ABC):

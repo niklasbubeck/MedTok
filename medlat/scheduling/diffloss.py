@@ -3,7 +3,7 @@ import torch.nn as nn
 from torch.utils.checkpoint import checkpoint
 import math
 
-from medlat.scheduling.gaussian import create_gaussian_diffusion
+from .gaussian import create_gaussian_diffusion
 from medlat.modules.embeddings import TimestepEmbedder
 
 

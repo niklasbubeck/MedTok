@@ -18,7 +18,9 @@ from .base import (
     GeneratorModel,
     AutoregressiveGenerator,
     NonAutoregressiveGenerator,
+    GenerativeScheduler,
 )
+from .scheduling import create_scheduler, DualTimestepScheduler
 
 __all__ = [
     "MODEL_REGISTRY",
@@ -36,4 +38,7 @@ __all__ = [
     "GeneratorModel",
     "AutoregressiveGenerator",
     "NonAutoregressiveGenerator",
+    "GenerativeScheduler",
+    "create_scheduler",
+    "DualTimestepScheduler",
 ]

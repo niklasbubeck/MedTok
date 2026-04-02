@@ -612,7 +612,7 @@ class GaussianDiffusion:
             # This is key: it forces the known area to remain fixed
             if noise_help_injection:
                 x_known = self.q_sample(x_0, t, noise=th.randn(*shape, device=device))
-            else: 
+            else:
                 x_known = self.q_sample(x_0, t, noise=0)
             img = x_known * mask + img * (1 - mask)
 
@@ -689,7 +689,7 @@ class GaussianDiffusion:
             img = x_known * mask + img * (1 - mask)
 
         return img
-        
+
     def ddim_sample(
         self,
         model,
