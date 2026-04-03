@@ -35,15 +35,15 @@ def AEKL_f4_d3(
     decoder = LDMDecoder(img_size=img_size, dims=dims, double_z=double_z, z_channels=z_channels, in_channels=in_channels, out_ch=out_ch, ch=ch, ch_mult=ch_mult, num_res_blocks=num_res_blocks, attn_resolutions=attn_resolutions, dropout=dropout)
     return AutoencoderKL(encoder=encoder, decoder=decoder, **kwargs)
 
-@register_model(f"continuous.aekl.f4_d8")
+@register_model(f"continuous.aekl.f4_d8", paper_url="https://arxiv.org/abs/2112.10752")
 def AEKL_f4_d8(**kwargs):
     return AEKL_f4_d3(z_channels=8, **kwargs)
 
-@register_model(f"continuous.aekl.f4_d16")
+@register_model(f"continuous.aekl.f4_d16", paper_url="https://arxiv.org/abs/2112.10752")
 def AEKL_f4_d16(**kwargs):
     return AEKL_f4_d3(z_channels=16, **kwargs)
 
-@register_model(f"continuous.aekl.f4_d32")
+@register_model(f"continuous.aekl.f4_d32", paper_url="https://arxiv.org/abs/2112.10752")
 def AEKL_f4_d32(**kwargs):
     return AEKL_f4_d3(z_channels=32, **kwargs)
 
@@ -75,15 +75,15 @@ def AEKL_f8_d4(
     return AutoencoderKL(encoder=encoder, decoder=decoder, **kwargs)
 
 
-@register_model(f"continuous.aekl.f8_d8")
+@register_model(f"continuous.aekl.f8_d8", paper_url="https://arxiv.org/abs/2112.10752")
 def AEKL_f8_d8(**kwargs):
     return AEKL_f8_d4(z_channels=8, **kwargs)
 
-@register_model(f"continuous.aekl.f8_d16")
+@register_model(f"continuous.aekl.f8_d16", paper_url="https://arxiv.org/abs/2112.10752")
 def AEKL_f8_d16(**kwargs):
     return AEKL_f8_d4(z_channels=16, **kwargs)
 
-@register_model(f"continuous.aekl.f8_d32")
+@register_model(f"continuous.aekl.f8_d32", paper_url="https://arxiv.org/abs/2112.10752")
 def AEKL_f8_d32(**kwargs):
     return AEKL_f8_d4(z_channels=32, **kwargs)
 
@@ -114,15 +114,15 @@ def AEKL_f16_d8(
     decoder = LDMDecoder(img_size=img_size, dims=dims, double_z=double_z, z_channels=z_channels, in_channels=in_channels, out_ch=out_ch, ch=ch, ch_mult=ch_mult, num_res_blocks=num_res_blocks, attn_resolutions=attn_resolutions, dropout=dropout)
     return AutoencoderKL(encoder=encoder, decoder=decoder, **kwargs)
 
-@register_model(f"continuous.aekl.f16_d16")
+@register_model(f"continuous.aekl.f16_d16", paper_url="https://arxiv.org/abs/2112.10752")
 def AEKL_f16_d16(**kwargs):
     return AEKL_f16_d8(z_channels=16, **kwargs)
 
-@register_model(f"continuous.aekl.f16_d32")
+@register_model(f"continuous.aekl.f16_d32", paper_url="https://arxiv.org/abs/2112.10752")
 def AEKL_f16_d32(**kwargs):
     return AEKL_f16_d8(z_channels=32, **kwargs)
 
-@register_model(f"continuous.aekl.f16_d64")
+@register_model(f"continuous.aekl.f16_d64", paper_url="https://arxiv.org/abs/2112.10752")
 def AEKL_f16_d64(**kwargs):
     return AEKL_f16_d8(z_channels=64, **kwargs)
 
@@ -224,7 +224,7 @@ def Maisi_f4_d4(
 
     return AutoencoderKL(encoder=encoder, decoder=decoder, kl_weight=1e-7, **kwargs)
 
-@register_model(f"continuous.medvae.f8_d16")
+@register_model(f"continuous.medvae.f8_d16", paper_url="https://arxiv.org/abs/2303.00915")
 def MedVAE_f8_d16(
     img_size=256,
     dims=2,
@@ -248,16 +248,16 @@ def MedVAE_f8_d16(
     return AutoencoderKL(encoder=encoder, decoder=decoder, alignment=alignment, **kwargs)
 
 
-@register_model(f"continuous.medvae.f8_d32")
+@register_model(f"continuous.medvae.f8_d32", paper_url="https://arxiv.org/abs/2303.00915")
 def MedVAE_f8_d32(**kwargs):
     return MedVAE_f8_d16(z_channels=32, **kwargs)
 
 
-@register_model(f"continuous.vavae.f8_d32_dinov2")
+@register_model(f"continuous.vavae.f8_d32_dinov2", paper_url="https://arxiv.org/abs/2501.01423")
 def VAVAE_f8_d32_dinov2(**kwargs):
     return VAVAE_f8_d16_dinov2(z_channels=32, **kwargs)
 
-@register_model(f"continuous.vavae.f8_d16_dinov2")
+@register_model(f"continuous.vavae.f8_d16_dinov2", paper_url="https://arxiv.org/abs/2501.01423")
 def VAVAE_f8_d16_dinov2(
     img_size=256,
     dims=2,
@@ -592,7 +592,7 @@ def DCAE_f128c512(
     )
 
 
-@register_model(f"discrete.hcvq.vae.S_16")
+@register_model(f"discrete.hcvq.vae.S_16", paper_url="https://arxiv.org/abs/2404.02905")
 def SDVQ_Transformer_S_16(
     img_size: int = 256,
     patch_size: int = 16,

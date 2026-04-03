@@ -13,7 +13,7 @@ Models are now registered with method-based configurations.
 
 # ---- Diffusion Model Config Methods ----
 
-@register_model("adm.diffusion.64C")
+@register_model("adm.diffusion.64C", paper_url="https://arxiv.org/abs/2105.05233")
 def adm_diffusion_64_conditioned_cfg(**overrides):
     cfg = dict(
         image_size=64,
@@ -39,7 +39,7 @@ def adm_diffusion_64_conditioned_cfg(**overrides):
     cfg.update(overrides)
     return cfg
 
-@register_model("adm.diffusion.64U")
+@register_model("adm.diffusion.64U", paper_url="https://arxiv.org/abs/2105.05233")
 def adm_diffusion_64_unconditioned_cfg(**overrides):
     cfg = dict(
         image_size=64,
@@ -65,7 +65,7 @@ def adm_diffusion_64_unconditioned_cfg(**overrides):
     cfg.update(overrides)
     return cfg
 
-@register_model("adm.diffusion.128C")
+@register_model("adm.diffusion.128C", paper_url="https://arxiv.org/abs/2105.05233")
 def adm_diffusion_128_conditioned_cfg(**overrides):
     cfg = dict(
         image_size=128,
@@ -91,7 +91,7 @@ def adm_diffusion_128_conditioned_cfg(**overrides):
     cfg.update(overrides)
     return cfg
 
-@register_model("adm.diffusion.128U")
+@register_model("adm.diffusion.128U", paper_url="https://arxiv.org/abs/2105.05233")
 def adm_diffusion_128_unconditioned_cfg(**overrides):
     cfg = dict(
         image_size=128,
@@ -117,7 +117,7 @@ def adm_diffusion_128_unconditioned_cfg(**overrides):
     cfg.update(overrides)
     return cfg
 
-@register_model("adm.diffusion.256C")
+@register_model("adm.diffusion.256C", paper_url="https://arxiv.org/abs/2105.05233")
 def adm_diffusion_256_conditioned_cfg(**overrides):
     cfg = dict(
         image_size=256,
@@ -143,7 +143,7 @@ def adm_diffusion_256_conditioned_cfg(**overrides):
     cfg.update(overrides)
     return cfg
 
-@register_model("adm.diffusion.256U")
+@register_model("adm.diffusion.256U", paper_url="https://arxiv.org/abs/2105.05233")
 def adm_diffusion_256_unconditioned_cfg(**overrides):
     cfg = dict(
         image_size=256,
@@ -169,7 +169,7 @@ def adm_diffusion_256_unconditioned_cfg(**overrides):
     cfg.update(overrides)
     return cfg
 
-@register_model("adm.diffusion.512C")
+@register_model("adm.diffusion.512C", paper_url="https://arxiv.org/abs/2105.05233")
 def adm_diffusion_512_conditioned_cfg(**overrides):
     cfg = dict(
         image_size=512,
@@ -195,7 +195,7 @@ def adm_diffusion_512_conditioned_cfg(**overrides):
     cfg.update(overrides)
     return cfg
 
-@register_model("adm.diffusion.512U")
+@register_model("adm.diffusion.512U", paper_url="https://arxiv.org/abs/2105.05233")
 def adm_diffusion_512_unconditioned_cfg(**overrides):
     cfg = dict(
         image_size=512,
@@ -223,7 +223,7 @@ def adm_diffusion_512_unconditioned_cfg(**overrides):
 
 # ---- Classifier Model Config Methods ----
 
-@register_model("adm.classifier.64C")
+@register_model("adm.classifier.64C", paper_url="https://arxiv.org/abs/2105.05233")
 def adm_classifier_64_cfg(**overrides):
     cfg = dict(
         image_size=64,
@@ -249,7 +249,7 @@ def adm_classifier_64_cfg(**overrides):
     cfg.update(overrides)
     return cfg
 
-@register_model("adm.classifier.128C")
+@register_model("adm.classifier.128C", paper_url="https://arxiv.org/abs/2105.05233")
 def adm_classifier_128_cfg(**overrides):
     cfg = dict(
         image_size=128,
@@ -275,7 +275,7 @@ def adm_classifier_128_cfg(**overrides):
     cfg.update(overrides)
     return cfg
 
-@register_model("adm.classifier.256C")
+@register_model("adm.classifier.256C", paper_url="https://arxiv.org/abs/2105.05233")
 def adm_classifier_256_cfg(**overrides):
     cfg = dict(
         image_size=256,
@@ -301,7 +301,7 @@ def adm_classifier_256_cfg(**overrides):
     cfg.update(overrides)
     return cfg
 
-@register_model("adm.classifier.512C")
+@register_model("adm.classifier.512C", paper_url="https://arxiv.org/abs/2105.05233")
 def adm_classifier_512_cfg(**overrides):
     cfg = dict(
         image_size=512,

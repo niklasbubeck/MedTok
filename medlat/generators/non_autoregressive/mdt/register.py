@@ -7,41 +7,41 @@ from .models import (
 __all__ = []
 
 
-@register_model("mdt.xl_2")
+@register_model("mdt.xl_2", paper_url="https://arxiv.org/abs/2303.04155")
 def mdt_xl_2(**kwargs):
     return MDTv2_XL_2(**kwargs)
 
 
-@register_model("mdt.l_2")
+@register_model("mdt.l_2", paper_url="https://arxiv.org/abs/2303.04155")
 def mdt_l_2(**kwargs):
     return MDTv2_L_2(**kwargs)
 
 
-@register_model("mdt.b_2")
+@register_model("mdt.b_2", paper_url="https://arxiv.org/abs/2303.04155")
 def mdt_b_2(**kwargs):
     return MDTv2_B_2(**kwargs)
 
 
-@register_model("mdt.s_2")
+@register_model("mdt.s_2", paper_url="https://arxiv.org/abs/2303.04155")
 def mdt_s_2(**kwargs):
     return MDTv2_S_2(**kwargs)
 
 
-@register_model("mdt.xl_4")
+@register_model("mdt.xl_4", paper_url="https://arxiv.org/abs/2303.04155")
 def mdt_xl_4(**kwargs):
     return MDTv2_XL_4(**kwargs)
 
 
-@register_model("mdt.l_4")
+@register_model("mdt.l_4", paper_url="https://arxiv.org/abs/2303.04155")
 def mdt_l_4(**kwargs):
     return MDTv2_L_4(**kwargs)
 
 
-@register_model("mdt.b_4")
+@register_model("mdt.b_4", paper_url="https://arxiv.org/abs/2303.04155")
 def mdt_b_4(**kwargs):
     return MDTv2_B_4(**kwargs)
 
 
-@register_model("mdt.s_4")
+@register_model("mdt.s_4", paper_url="https://arxiv.org/abs/2303.04155")
 def mdt_s_4(**kwargs):
     return MDTv2_S_4(**kwargs)

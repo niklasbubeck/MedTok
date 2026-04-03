@@ -5,66 +5,66 @@ from .models import DiT
 
 __all__ = []
 
-@register_model("dit.xl_1")
+@register_model("dit.xl_1", paper_url="https://arxiv.org/abs/2212.09748")
 def DiT_XL_1(**kwargs):
     return DiT(depth=28, hidden_size=1152, patch_size=1, num_heads=16, **kwargs)
 
-@register_model("dit.xl_2")
+@register_model("dit.xl_2", paper_url="https://arxiv.org/abs/2212.09748")
 def DiT_XL_2(**kwargs):
     return DiT(depth=28, hidden_size=1152, patch_size=2, num_heads=16, **kwargs)
 
-@register_model("dit.xl_4")
+@register_model("dit.xl_4", paper_url="https://arxiv.org/abs/2212.09748")
 def DiT_XL_4(**kwargs):
     return DiT(depth=28, hidden_size=1152, patch_size=4, num_heads=16, **kwargs)
 
-@register_model("dit.xl_8")
+@register_model("dit.xl_8", paper_url="https://arxiv.org/abs/2212.09748")
 def DiT_XL_8(**kwargs):
     return DiT(depth=28, hidden_size=1152, patch_size=8, num_heads=16, **kwargs)
 
-@register_model("dit.l_1")
+@register_model("dit.l_1", paper_url="https://arxiv.org/abs/2212.09748")
 def DiT_L_1(**kwargs):
     return DiT(depth=24, hidden_size=1024, patch_size=1, num_heads=16, **kwargs)
 
-@register_model("dit.l_2")
+@register_model("dit.l_2", paper_url="https://arxiv.org/abs/2212.09748")
 def DiT_L_2(**kwargs):
     return DiT(depth=24, hidden_size=1024, patch_size=2, num_heads=16, **kwargs)
 
-@register_model("dit.l_4")
+@register_model("dit.l_4", paper_url="https://arxiv.org/abs/2212.09748")
 def DiT_L_4(**kwargs):
     return DiT(depth=24, hidden_size=1024, patch_size=4, num_heads=16, **kwargs)
 
-@register_model("dit.l_8")
+@register_model("dit.l_8", paper_url="https://arxiv.org/abs/2212.09748")
 def DiT_L_8(**kwargs):
     return DiT(depth=24, hidden_size=1024, patch_size=8, num_heads=16, **kwargs)
 
-@register_model("dit.b_1")
+@register_model("dit.b_1", paper_url="https://arxiv.org/abs/2212.09748")
 def DiT_B_1(**kwargs):
     return DiT(depth=12, hidden_size=768, patch_size=1, num_heads=12, **kwargs)
 
-@register_model("dit.b_2")
+@register_model("dit.b_2", paper_url="https://arxiv.org/abs/2212.09748")
 def DiT_B_2(**kwargs):
     return DiT(depth=12, hidden_size=768, patch_size=2, num_heads=12, **kwargs)
 
-@register_model("dit.b_4")
+@register_model("dit.b_4", paper_url="https://arxiv.org/abs/2212.09748")
 def DiT_B_4(**kwargs):
     return DiT(depth=12, hidden_size=768, patch_size=4, num_heads=12, **kwargs)
 
-@register_model("dit.b_8")
+@register_model("dit.b_8", paper_url="https://arxiv.org/abs/2212.09748")
 def DiT_B_8(**kwargs):
     return DiT(depth=12, hidden_size=768, patch_size=8, num_heads=12, **kwargs)
 
-@register_model("dit.s_1")
+@register_model("dit.s_1", paper_url="https://arxiv.org/abs/2212.09748")
 def DiT_S_1(**kwargs):
     return DiT(depth=12, hidden_size=384, patch_size=1, num_heads=6, **kwargs)
 
-@register_model("dit.s_2")
+@register_model("dit.s_2", paper_url="https://arxiv.org/abs/2212.09748")
 def DiT_S_2(**kwargs):
     return DiT(depth=12, hidden_size=384, patch_size=2, num_heads=6, **kwargs)
 
-@register_model("dit.s_4")
+@register_model("dit.s_4", paper_url="https://arxiv.org/abs/2212.09748")
 def DiT_S_4(**kwargs):
     return DiT(depth=12, hidden_size=384, patch_size=4, num_heads=6, **kwargs)
 
-@register_model("dit.s_8")
+@register_model("dit.s_8", paper_url="https://arxiv.org/abs/2212.09748")
 def DiT_S_8(**kwargs):
     return DiT(depth=12, hidden_size=384, patch_size=8, num_heads=6, **kwargs)

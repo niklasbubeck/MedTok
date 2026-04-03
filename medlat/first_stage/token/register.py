@@ -12,7 +12,7 @@ from medlat.first_stage.discrete.quantizer.quantize import SoftVectorQuantizer
 from medlat.modules.alignments import *
 
 
-@register_model("token.titok.s_128")
+@register_model("token.titok.s_128", paper_url="https://arxiv.org/abs/2406.07550")
 def TiTok_S_128(
     img_size: int | tuple[int, ...],
     patch_size: int | tuple[int, ...] = 16, 
@@ -48,20 +48,20 @@ def TiTok_S_128(
         **kwargs,
     )
 
-@register_model("token.titok.s_128_e2e")
+@register_model("token.titok.s_128_e2e", paper_url="https://arxiv.org/abs/2406.07550")
 def TiTok_S_128_E2E(**kwargs):
     return TiTok_S_128(num_latent_tokens=128, patch_size=8, stage="e2e", **kwargs)
 
-@register_model("token.titok.s_256_e2e")
+@register_model("token.titok.s_256_e2e", paper_url="https://arxiv.org/abs/2406.07550")
 def TiTok_S_256_E2E(**kwargs):
     return TiTok_S_128(num_latent_tokens=256, patch_size=8, stage="e2e", **kwargs)
 
-@register_model("token.titok.s_512_e2e")
+@register_model("token.titok.s_512_e2e", paper_url="https://arxiv.org/abs/2406.07550")
 def TiTok_S_512_E2E(**kwargs):
     return TiTok_S_128(num_latent_tokens=512, patch_size=8, stage="e2e", **kwargs)
 
 
-@register_model("token.titok.b_64")
+@register_model("token.titok.b_64", paper_url="https://arxiv.org/abs/2406.07550")
 def TiTok_B_64(img_size: int | tuple[int, ...],
                 patch_size: int | tuple[int, ...] = 16, 
                 hidden_size=768,
@@ -79,19 +79,19 @@ def TiTok_B_64(img_size: int | tuple[int, ...],
                 **kwargs):
     return TiTok(img_size=img_size, patch_size=patch_size, hidden_size=hidden_size, in_channels=in_channels, out_channels=out_channels, depth=depth, num_heads=num_heads, num_latent_tokens=num_latent_tokens, token_size=token_size, codebook_size=codebook_size, quantizer_loss_weight=quantizer_loss_weight, pixel_vqgan=pixel_vqgan, stage=stage, quantize_mode=quantize_mode, **kwargs)
 
-@register_model("token.titok.b_128_p8_e2e")
+@register_model("token.titok.b_128_p8_e2e", paper_url="https://arxiv.org/abs/2406.07550")
 def TiTok_B_128_p8_E2E(**kwargs):
     return TiTok_B_64(num_latent_tokens=128, patch_size=8, stage="e2e", **kwargs)
 
-@register_model("token.titok.b_256_p8_e2e")
+@register_model("token.titok.b_256_p8_e2e", paper_url="https://arxiv.org/abs/2406.07550")
 def TiTok_B_256_p8_E2E(**kwargs):
     return TiTok_B_64(num_latent_tokens=256, patch_size=8, stage="e2e", **kwargs)
 
-@register_model("token.titok.b_512_p8_e2e")
+@register_model("token.titok.b_512_p8_e2e", paper_url="https://arxiv.org/abs/2406.07550")
 def TiTok_B_512_p8_E2E(**kwargs):
     return TiTok_B_64(num_latent_tokens=512, patch_size=8, stage="e2e", **kwargs)
 
-@register_model("token.titok.l_32")
+@register_model("token.titok.l_32", paper_url="https://arxiv.org/abs/2406.07550")
 def TiTok_L_32(img_size: int | tuple[int, ...],
                 patch_size: int | tuple[int, ...] = 16, 
                 hidden_size=1024,
@@ -109,25 +109,25 @@ def TiTok_L_32(img_size: int | tuple[int, ...],
                 **kwargs):
     return TiTok(img_size=img_size, patch_size=patch_size, hidden_size=hidden_size, in_channels=in_channels, out_channels=out_channels, depth=depth, num_heads=num_heads, num_latent_tokens=num_latent_tokens, token_size=token_size, codebook_size=codebook_size, quantizer_loss_weight=quantizer_loss_weight, pixel_vqgan=pixel_vqgan, stage=stage, quantize_mode=quantize_mode, **kwargs)
 
-@register_model("token.titok.l_64_e2e")
+@register_model("token.titok.l_64_e2e", paper_url="https://arxiv.org/abs/2406.07550")
 def TiTok_L_64_E2E(**kwargs):
     return TiTok_L_32(num_latent_tokens=64, stage="e2e", **kwargs)
 
-@register_model("token.titok.l_128_e2e")
+@register_model("token.titok.l_128_e2e", paper_url="https://arxiv.org/abs/2406.07550")
 def TiTok_L_128_E2E(**kwargs):
     return TiTok_L_32(num_latent_tokens=128, stage="e2e", **kwargs)
 
-@register_model("token.titok.l_256_e2e")
+@register_model("token.titok.l_256_e2e", paper_url="https://arxiv.org/abs/2406.07550")
 def TiTok_L_256_E2E(**kwargs):
     return TiTok_L_32(num_latent_tokens=256, stage="e2e", **kwargs)
 
-@register_model("token.titok.l_512_e2e")
+@register_model("token.titok.l_512_e2e", paper_url="https://arxiv.org/abs/2406.07550")
 def TiTok_L_512_E2E(**kwargs):
     return TiTok_L_32(num_latent_tokens=512, stage="e2e", **kwargs)
 
 
 ###### MAETOK #######
-@register_model("token.maetok.s_128")
+@register_model("token.maetok.s_128", paper_url="https://arxiv.org/abs/2502.03444")
 def MAETok_S_128(img_size: int = 256, 
                  patch_size: int = 16,
                  codebook_embed_dim: int = 32,
@@ -145,11 +145,11 @@ def MAETok_S_128(img_size: int = 256,
     return MaskAEModel(img_size=img_size, base_img_size=img_size, patch_size=patch_size, codebook_embed_dim=codebook_embed_dim, num_latent_tokens=num_latent_tokens, enc_embed_dim=enc_embed_dim, dec_embed_dim=dec_embed_dim, enc_depth=enc_depth, dec_depth=dec_depth, enc_num_heads=enc_num_heads, dec_num_heads=dec_num_heads, aux_hog_dec=aux_hog_dec, aux_dino_dec=aux_dino_dec, aux_clip_dec=aux_clip_dec, aux_biomed_clip_dec=aux_biomed_clip_dec, **kwargs)
 
 
-@register_model("token.maetok.s_256")
+@register_model("token.maetok.s_256", paper_url="https://arxiv.org/abs/2502.03444")
 def MAETok_S_256(**kwargs):
     return MAETok_S_128(num_latent_tokens=256, **kwargs)
 
-@register_model("token.maetok.s_512")
+@register_model("token.maetok.s_512", paper_url="https://arxiv.org/abs/2502.03444")
 def MAETok_S_512(**kwargs):
     return MAETok_S_128(num_latent_tokens=512, **kwargs)
 
@@ -168,20 +168,20 @@ def MAETok_B_128(img_size: int = 256,
                  **kwargs):
     return MaskAEModel(img_size=img_size, base_img_size=img_size, patch_size=patch_size, codebook_embed_dim=codebook_embed_dim, num_latent_tokens=num_latent_tokens, aux_hog_dec=aux_hog_dec, aux_dino_dec=aux_dino_dec, aux_clip_dec=aux_clip_dec, aux_biomed_clip_dec=aux_biomed_clip_dec, **kwargs)
 
-@register_model("token.maetok.b_128_p8")
+@register_model("token.maetok.b_128_p8", paper_url="https://arxiv.org/abs/2502.03444")
 def MAETok_B_128_p8(**kwargs):
     return MAETok_B_128(num_latent_tokens=128, patch_size=8, **kwargs)
 
-@register_model("token.maetok.b_256_p8")
+@register_model("token.maetok.b_256_p8", paper_url="https://arxiv.org/abs/2502.03444")
 def MAETok_B_256_p8(**kwargs):
     return MAETok_B_128(num_latent_tokens=256, patch_size=8, **kwargs)
 
-@register_model("token.maetok.b_512_p8")
+@register_model("token.maetok.b_512_p8", paper_url="https://arxiv.org/abs/2502.03444")
 def MAETok_B_512_p8(**kwargs):
     return MAETok_B_128(num_latent_tokens=512, patch_size=8, **kwargs)
 
 
-@register_model("token.maetok.l_128")
+@register_model("token.maetok.l_128", paper_url="https://arxiv.org/abs/2502.03444")
 def MAETok_L_128(img_size: int = 256, 
                  patch_size: int = 16,
                  codebook_embed_dim: int = 32,
@@ -198,11 +198,11 @@ def MAETok_L_128(img_size: int = 256,
                  aux_biomed_clip_dec: bool = False, **kwargs):  
     return MaskAEModel(img_size=img_size, base_img_size=img_size, patch_size=patch_size, codebook_embed_dim=codebook_embed_dim, num_latent_tokens=num_latent_tokens, enc_embed_dim=enc_embed_dim, dec_embed_dim=dec_embed_dim, enc_depth=enc_depth, dec_depth=dec_depth, enc_num_heads=enc_num_heads, dec_num_heads=dec_num_heads, aux_hog_dec=aux_hog_dec, aux_dino_dec=aux_dino_dec, aux_clip_dec=aux_clip_dec, aux_biomed_clip_dec=aux_biomed_clip_dec, **kwargs)
 
-@register_model("token.maetok.l_256")
+@register_model("token.maetok.l_256", paper_url="https://arxiv.org/abs/2502.03444")
 def MAETok_L_256(**kwargs):
     return MAETok_L_128(num_latent_tokens=256, **kwargs)
 
-@register_model("token.maetok.l_512")
+@register_model("token.maetok.l_512", paper_url="https://arxiv.org/abs/2502.03444")
 def MAETok_L_512(**kwargs):
     return MAETok_L_128(num_latent_tokens=512, **kwargs)
 
@@ -210,7 +210,7 @@ def MAETok_L_512(**kwargs):
 
 ###### SoftVQ #######
 
-@register_model("token.softvq.s_t32_d32")
+@register_model("token.softvq.s_t32_d32", paper_url="https://arxiv.org/abs/2412.09628")
 def SoftVQ_S_T32_D32(
     img_size: int = 256,
     patch_size: int = 16,
@@ -281,7 +281,7 @@ def SoftVQ_S_T32_D32(
     alignment = DinoAlignment(decoder=aux_dino_decoder, codebook_embed_dim=e_dim, img_size=img_size)
     return VQModel(encoder=encoder, decoder=decoder, quantizer=quantizer, alignment=alignment, pre_post_layer="linear", **kwargs)
 
-@register_model("token.softvq.s_t64_d32")
+@register_model("token.softvq.s_t64_d32", paper_url="https://arxiv.org/abs/2412.09628")
 def SoftVQ_S_T64_D32(
     img_size: int = 256,
     patch_size: int = 16,
@@ -353,7 +353,7 @@ def SoftVQ_S_T64_D32(
     return VQModel(encoder=encoder, decoder=decoder, quantizer=quantizer, alignment=alignment, pre_post_layer="linear", **kwargs)
 
 
-@register_model("token.softvq.b_t32_d32")
+@register_model("token.softvq.b_t32_d32", paper_url="https://arxiv.org/abs/2412.09628")
 def SoftVQ_B_T32_D32(
     img_size: int = 256,
     patch_size: int = 16,
@@ -424,7 +424,7 @@ def SoftVQ_B_T32_D32(
     alignment = DinoAlignment(decoder=aux_dino_decoder, codebook_embed_dim=e_dim, img_size=img_size)
     return VQModel(encoder=encoder, decoder=decoder, quantizer=quantizer, alignment=alignment, pre_post_layer="linear", **kwargs)
 
-@register_model("token.softvq.b_t64_d32")
+@register_model("token.softvq.b_t64_d32", paper_url="https://arxiv.org/abs/2412.09628")
 def SoftVQ_B_T64_D32(
     img_size: int = 256,
     patch_size: int = 16,
@@ -495,7 +495,7 @@ def SoftVQ_B_T64_D32(
     alignment = DinoAlignment(decoder=aux_dino_decoder, codebook_embed_dim=e_dim, img_size=img_size)
     return VQModel(encoder=encoder, decoder=decoder, quantizer=quantizer, alignment=alignment, pre_post_layer="linear", **kwargs)
 
-@register_model("token.softvq.bl_t32_d32")
+@register_model("token.softvq.bl_t32_d32", paper_url="https://arxiv.org/abs/2412.09628")
 def SoftVQ_BL_T32_D32(
     img_size: int = 256,
     patch_size: int = 16,
@@ -566,7 +566,7 @@ def SoftVQ_BL_T32_D32(
     alignment = DinoAlignment(decoder=aux_dino_decoder, codebook_embed_dim=e_dim, img_size=img_size)
     return VQModel(encoder=encoder, decoder=decoder, quantizer=quantizer, alignment=alignment, pre_post_layer="linear", **kwargs)
 
-@register_model("token.softvq.bl_t64_d32")
+@register_model("token.softvq.bl_t64_d32", paper_url="https://arxiv.org/abs/2412.09628")
 def SoftVQ_BL_T64_D32(
     img_size: int = 256,
     patch_size: int = 16,
@@ -637,7 +637,7 @@ def SoftVQ_BL_T64_D32(
     alignment = DinoAlignment(decoder=aux_dino_decoder, codebook_embed_dim=e_dim, img_size=img_size)
     return VQModel(encoder=encoder, decoder=decoder, quantizer=quantizer, alignment=alignment, **kwargs)
 
-@register_model("token.softvq.l_t32_d32")
+@register_model("token.softvq.l_t32_d32", paper_url="https://arxiv.org/abs/2412.09628")
 def SoftVQ_L_T32_D32(
     img_size: int = 256,
     patch_size: int = 16,
@@ -708,7 +708,7 @@ def SoftVQ_L_T32_D32(
     alignment = DinoAlignment(decoder=aux_dino_decoder, codebook_embed_dim=e_dim, img_size=img_size)
     return VQModel(encoder=encoder, decoder=decoder, quantizer=quantizer, alignment=alignment, pre_post_layer="linear", **kwargs)
 
-@register_model("token.softvq.l_t64_d32")
+@register_model("token.softvq.l_t64_d32", paper_url="https://arxiv.org/abs/2412.09628")
 def SoftVQ_L_T64_D32(
     img_size: int = 256,
     patch_size: int = 16,

@@ -401,44 +401,44 @@ Registry IDs follow consistent patterns:
 
 ### First stage — Tokenizers & patch sequences (`token.*`)
 
-| Family | What it does | Example IDs |
-|--------|-------------|-------------|
-| **TiTok** | Compact 1-D token sequences for generation | `token.titok.s_128`, `token.titok.b_256_p8_e2e` |
-| **MAETok** | MAE-style reconstruction tokenizer | `token.maetok.s_256`, `token.maetok.b_512_p8` |
-| **VMAE** | ViT/VideoMAE-style encoder tokenizer | `token.vmae.s_p8_d16`, `token.vmae.b_p16_d32` |
-| **DeTok** | Scale grid (ss / sb / bb / … / xlxl) | `token.detok.ss`, `token.detok.xlxl` |
-| **SoftVQ** | Differentiable soft VQ tokenizer | `token.softvq.s_t32_d32`, `token.softvq.bl_t64_d32` |
-| **ViTA** | ViT-based reconstruction AE | `token.vita.reconmae` |
+| Family | What it does | Example IDs | Paper |
+|--------|-------------|-------------|-------|
+| **TiTok** | Compact 1-D token sequences for generation | `token.titok.s_128`, `token.titok.b_256_p8_e2e` | [arXiv](https://arxiv.org/abs/2406.07550) |
+| **MAETok** | MAE-style reconstruction tokenizer | `token.maetok.s_256`, `token.maetok.b_512_p8` | [arXiv](https://arxiv.org/abs/2502.03444) |
+| **VMAE** | ViT/VideoMAE-style encoder tokenizer | `token.vmae.s_p8_d16`, `token.vmae.b_p16_d32` | [arXiv](https://arxiv.org/abs/2203.12602) |
+| **DeTok** | Scale grid (ss / sb / bb / … / xlxl) | `token.detok.ss`, `token.detok.xlxl` | — |
+| **SoftVQ** | Differentiable soft VQ tokenizer | `token.softvq.s_t32_d32`, `token.softvq.bl_t64_d32` | [arXiv](https://arxiv.org/abs/2412.09628) |
+| **ViTA** | ViT-based reconstruction AE | `token.vita.reconmae` | — |
 
 ---
 
 ### First stage — Continuous autoencoders (`continuous.*`)
 
-| Family | What it does | Example IDs |
-|--------|-------------|-------------|
-| **AEKL** | LDM-style KL autoencoder, conv encoder/decoder | `continuous.aekl.f4_d3` … `continuous.aekl.f32_d64` |
-| **MAISI** | MONAI MAISI 3D-friendly KL AE | `continuous.maisi.f4_d3` |
-| **MedVAE** | KL AE + **BiomedCLIP VF alignment** — semantically structured latents for medical images | `continuous.medvae.f8_d16`, `continuous.medvae.f8_d32` |
-| **VAVAE** | KL AE + **vision-foundation VF alignment** (DINOv2 or MAE) — same idea as VA-VAE paper | `continuous.vavae.f8_d32_dinov2`, `continuous.vavae.f16_d64_mae` |
-| **DCAE** | EfficientViT DC-AE (high compression ratio) | `continuous.dcae.f32c32`, `continuous.dcae.f128c512` |
-| **SoftVQ / WQVAE** | Soft or warped quantization, continuous wrapper | `continuous.soft_vq.f8_d16_e16384_dinov2`, `continuous.wqvae.f8_d4_e16384` |
+| Family | What it does | Example IDs | Paper |
+|--------|-------------|-------------|-------|
+| **AEKL** | LDM-style KL autoencoder, conv encoder/decoder | `continuous.aekl.f4_d3` … `continuous.aekl.f32_d64` | [arXiv](https://arxiv.org/abs/2112.10752) |
+| **MAISI** | MONAI MAISI 3D-friendly KL AE | `continuous.maisi.f4_d3` | [arXiv](https://arxiv.org/abs/2507.05622) |
+| **MedVAE** | KL AE + **BiomedCLIP VF alignment** — semantically structured latents for medical images | `continuous.medvae.f8_d16`, `continuous.medvae.f8_d32` | [arXiv](https://arxiv.org/abs/2303.00915) |
+| **VAVAE** | KL AE + **vision-foundation VF alignment** (DINOv2 or MAE) — same idea as VA-VAE paper | `continuous.vavae.f8_d32_dinov2`, `continuous.vavae.f16_d64_mae` | [arXiv](https://arxiv.org/abs/2501.01423) |
+| **DCAE** | EfficientViT DC-AE (high compression ratio) | `continuous.dcae.f32c32`, `continuous.dcae.f128c512` | [arXiv](https://arxiv.org/abs/2410.10733) |
+| **SoftVQ / WQVAE** | Soft or warped quantization, continuous wrapper | `continuous.soft_vq.f8_d16_e16384_dinov2`, `continuous.wqvae.f8_d4_e16384` | [arXiv](https://arxiv.org/abs/2412.09628) |
 
 ---
 
 ### First stage — Discrete VAEs (`discrete.*`)
 
-| Family | What it does | Example IDs |
-|--------|-------------|-------------|
-| **VQ-VAE** | VQGAN-style conv VQ | `discrete.vq.f4_d3_e8192` … `discrete.vq.f16_d64_e16384` |
-| **LFQ** | Lookup-free quantization (implicit codebook) | `discrete.lfq.f4_d10_b10` … `discrete.lfq.f16_d18_b18` |
-| **BSQ** | Binary spherical quantization | `discrete.bsq.f4_d10_b10` … `discrete.bsq.f16_d18_b18` |
-| **FSQ** | Finite scalar quantization | `discrete.fsq.f4_d3_l8192`, `discrete.fsq.f16_d8_l16384` |
-| **SimVQ** | Simplified VQ with codebook collapse prevention | `discrete.simvq.f4_d3_e8192` … `discrete.simvq.f16_d8_e16384` |
-| **RQVAE** | Residual quantizer VAE (multi-level codes) | `discrete.rqvae.f4_d3_e8192` … `discrete.rqvae.f16_d8_e16384` |
-| **QINCo family** | Improved nearest-code quantizers | `discrete.simple_qinco.*`, `discrete.qinco.*`, `discrete.rsimple_qinco.*` |
-| **HCVQ** | Hybrid conv/ViT quantizer presets | `discrete.hcvq.residual_vq.S_16`, `discrete.hcvq.sd_vq.S_16` |
-| **MaskGIT-VQ** | VQ preset for MaskGIT-style pipelines | `discrete.maskgit.vq.f16_d256_e1024` |
-| **MS-RQ** | Multi-scale residual quantization | `discrete.msrq.f16_d32_e4096` |
+| Family | What it does | Example IDs | Paper |
+|--------|-------------|-------------|-------|
+| **VQ-VAE** | VQGAN-style conv VQ | `discrete.vq.f4_d3_e8192` … `discrete.vq.f16_d64_e16384` | [arXiv](https://arxiv.org/abs/2012.09841) |
+| **LFQ** | Lookup-free quantization (implicit codebook) | `discrete.lfq.f4_d10_b10` … `discrete.lfq.f16_d18_b18` | [arXiv](https://arxiv.org/abs/2310.05737) |
+| **BSQ** | Binary spherical quantization | `discrete.bsq.f4_d10_b10` … `discrete.bsq.f16_d18_b18` | [arXiv](https://arxiv.org/abs/2501.05737) |
+| **FSQ** | Finite scalar quantization | `discrete.fsq.f4_d3_l8192`, `discrete.fsq.f16_d8_l16384` | [arXiv](https://arxiv.org/abs/2309.15505) |
+| **SimVQ** | Simplified VQ with codebook collapse prevention | `discrete.simvq.f4_d3_e8192` … `discrete.simvq.f16_d8_e16384` | [arXiv](https://arxiv.org/abs/2411.02038) |
+| **RQVAE** | Residual quantizer VAE (multi-level codes) | `discrete.rqvae.f4_d3_e8192` … `discrete.rqvae.f16_d8_e16384` | [arXiv](https://arxiv.org/abs/2203.01941) |
+| **QINCo family** | Improved nearest-code quantizers | `discrete.simple_qinco.*`, `discrete.qinco.*`, `discrete.rsimple_qinco.*` | [arXiv](https://arxiv.org/abs/2404.02905) |
+| **HCVQ** | Hybrid conv/ViT quantizer presets | `discrete.hcvq.residual_vq.S_16`, `discrete.hcvq.sd_vq.S_16` | [arXiv](https://arxiv.org/abs/2404.02905) |
+| **MaskGIT-VQ** | VQ preset for MaskGIT-style pipelines | `discrete.maskgit.vq.f16_d256_e1024` | [arXiv](https://arxiv.org/abs/2202.04200) |
+| **MS-RQ** | Multi-scale residual quantization | `discrete.msrq.f16_d32_e4096` | — |
 
 Standalone quantizer modules (for custom VQ composition):
 `discrete.quantizer.vector_quantizer`, `discrete.quantizer.lookup_free_quantizer`, `discrete.quantizer.finite_scalar_quantizer`, `discrete.quantizer.residual_quantizer`, `discrete.quantizer.binary_spherical_quantizer`, `discrete.quantizer.soft_vector_quantizer`, …
@@ -449,34 +449,34 @@ Standalone quantizer modules (for custom VQ composition):
 
 #### Discrete AR (pair with discrete tokenizers)
 
-| Model | What it does | IDs | Interface |
-|-------|-------------|-----|-----------|
-| **MaskGIT** | Iterative masked token generation (BERT + cosine schedule) | `maskgit.b`, `maskgit.l`, `maskgit.h` | `wrapper(z, y=labels)` → loss |
-| **MAGE** | Masked generative encoder-decoder ViT | `mage.xs_4` … `mage.l_16` | `wrapper(z, labels)` → `(loss, …)`; suffix = vae_stride |
-| **Taming GPT** | Autoregressive next-token prediction (GPT) | `taming.gpt_b`, `taming.gpt_l`, `taming.gpt_h` | `generator(z[:-1], targets=z[1:])` → `(logits, loss)` |
-| **MaskBit** | BERT-style masked generation for VQ (`Bert`) or LFQ (`LFQBert`) | `maskbit.s/b/l`, `maskbit.bert_s/b/l` | custom masked training loop |
+| Model | What it does | IDs | Paper |
+|-------|-------------|-----|-------|
+| **MaskGIT** | Iterative masked token generation (BERT + cosine schedule) | `maskgit.b`, `maskgit.l`, `maskgit.h` | [arXiv](https://arxiv.org/abs/2202.04200) |
+| **MAGE** | Masked generative encoder-decoder ViT | `mage.xs_4` … `mage.l_16` | [arXiv](https://arxiv.org/abs/2211.09117) |
+| **Taming GPT** | Autoregressive next-token prediction (GPT) | `taming.gpt_b`, `taming.gpt_l`, `taming.gpt_h` | [arXiv](https://arxiv.org/abs/2012.09841) |
+| **MaskBit** | BERT-style masked generation for VQ (`Bert`) or LFQ (`LFQBert`) | `maskbit.s/b/l`, `maskbit.bert_s/b/l` | [arXiv](https://arxiv.org/abs/2409.16211) |
 
 > ⚠️ **MAGE constraint:** the patch size suffix in the model name must match the tokenizer's `vae_stride` (e.g. `mage.b_8` only works with `f8` tokenizers).
 
 #### Continuous AR (pair with continuous tokenizers)
 
-| Model | What it does | IDs | Interface |
-|-------|-------------|-----|-----------|
-| **MAR** | Masked autoregressive with diffusion loss (continuous tokens) | `mar.b`, `mar.l`, `mar.h` | `wrapper(z, y=labels)` → loss; `z` is `(B, C, H, W)` |
-| **RAR** | Recurrent autoregressive with diffusion loss | `rar.b`, `rar.l`, `rar.xl`, `rar.h` | `generator(z_flat, labels)` → loss; `z_flat` is `(B, H×W, C)` |
-| **FractalGen** | Hierarchical fractal AR (multi-level MAR/AR cascade) | `fractal.ar_64`, `fractal.mar_64`, `fractal.mar_base_256`, … | custom hierarchical loop |
+| Model | What it does | IDs | Paper |
+|-------|-------------|-----|-------|
+| **MAR** | Masked autoregressive with diffusion loss (continuous tokens) | `mar.b`, `mar.l`, `mar.h` | [arXiv](https://arxiv.org/abs/2406.11838) |
+| **RAR** | Recurrent autoregressive with diffusion loss | `rar.b`, `rar.l`, `rar.xl`, `rar.h` | [arXiv](https://arxiv.org/abs/2411.00776) |
+| **FractalGen** | Hierarchical fractal AR (multi-level MAR/AR cascade) | `fractal.ar_64`, `fractal.mar_64`, `fractal.mar_base_256`, … | [arXiv](https://arxiv.org/abs/2501.05372) |
 
 ---
 
 ### Generators — Non-autoregressive (diffusion)
 
-| Model | What it does | IDs | Notes |
+| Model | What it does | IDs | Paper |
 |-------|-------------|-----|-------|
-| **DiT** | Diffusion Transformer — patchified latents, adaLN conditioning | `dit.s_1` … `dit.xl_8` (scale × patch) | 16 configs; `vae_stride` + `in_channels` required |
-| **MDT** | Masked Diffusion Transformer — masked encoder decoder | `mdt.s_2` … `mdt.xl_4` (scale × patch) | 8 configs |
-| **UViT** | U-Net ViT hybrid diffusion | `uvit.small`, `uvit.small_deep`, `uvit.mid`, `uvit.large`, `uvit.huge` | 5 configs |
-| **LDM** | Latent Diffusion UNet (various strides) | `ldm.f1` … `ldm.f16` | classic DDPM UNet |
-| **ADM** | Dhariwal–Nichol UNet + class-conditional classifiers | `adm.diffusion.{64,128,256,512}{C,U}`, `adm.classifier.*` | resolution-specific |
+| **DiT** | Diffusion Transformer — patchified latents, adaLN conditioning | `dit.s_1` … `dit.xl_8` (scale × patch) | [arXiv](https://arxiv.org/abs/2212.09748) |
+| **MDT** | Masked Diffusion Transformer — masked encoder decoder | `mdt.s_2` … `mdt.xl_4` (scale × patch) | [arXiv](https://arxiv.org/abs/2303.04155) |
+| **UViT** | U-Net ViT hybrid diffusion | `uvit.small`, `uvit.small_deep`, `uvit.mid`, `uvit.large`, `uvit.huge` | [arXiv](https://arxiv.org/abs/2209.12152) |
+| **LDM** | Latent Diffusion UNet (various strides) | `ldm.f1` … `ldm.f16` | [arXiv](https://arxiv.org/abs/2112.10752) |
+| **ADM** | Dhariwal–Nichol UNet + class-conditional classifiers | `adm.diffusion.{64,128,256,512}{C,U}`, `adm.classifier.*` | [arXiv](https://arxiv.org/abs/2105.05233) |
 
 All diffusion generators integrate with `medlat.diffusion.create_gaussian_diffusion`.
 

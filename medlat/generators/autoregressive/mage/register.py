@@ -9,61 +9,61 @@ from .mage import (
 __all__ = []
 
 
-@register_model("mage.xs_4")
+@register_model("mage.xs_4", paper_url="https://arxiv.org/abs/2211.09117")
 def mage_xs_4(**kwargs):
     return MAGE_ViT_XS_4(**kwargs)
 
 
-@register_model("mage.xs_8")
+@register_model("mage.xs_8", paper_url="https://arxiv.org/abs/2211.09117")
 def mage_xs_8(**kwargs):
     return MAGE_ViT_XS_8(**kwargs)
 
 
-@register_model("mage.xs_16")
+@register_model("mage.xs_16", paper_url="https://arxiv.org/abs/2211.09117")
 def mage_xs_16(**kwargs):
     return MAGE_ViT_XS_16(**kwargs)
 
 
-@register_model("mage.s_4")
+@register_model("mage.s_4", paper_url="https://arxiv.org/abs/2211.09117")
 def mage_s_4(**kwargs):
     return MAGE_ViT_S_4(**kwargs)
 
 
-@register_model("mage.s_8")
+@register_model("mage.s_8", paper_url="https://arxiv.org/abs/2211.09117")
 def mage_s_8(**kwargs):
     return MAGE_ViT_S_8(**kwargs)
 
 
-@register_model("mage.s_16")
+@register_model("mage.s_16", paper_url="https://arxiv.org/abs/2211.09117")
 def mage_s_16(**kwargs):
     return MAGE_ViT_S_16(**kwargs)
 
 
-@register_model("mage.b_4")
+@register_model("mage.b_4", paper_url="https://arxiv.org/abs/2211.09117")
 def mage_b_4(**kwargs):
     return MAGE_ViT_B_4(**kwargs)
 
 
-@register_model("mage.b_8")
+@register_model("mage.b_8", paper_url="https://arxiv.org/abs/2211.09117")
 def mage_b_8(**kwargs):
     return MAGE_ViT_B_8(**kwargs)
 
 
-@register_model("mage.b_16")
+@register_model("mage.b_16", paper_url="https://arxiv.org/abs/2211.09117")
 def mage_b_16(**kwargs):
     return MAGE_ViT_B_16(**kwargs)
 
 
-@register_model("mage.l_4")
+@register_model("mage.l_4", paper_url="https://arxiv.org/abs/2211.09117")
 def mage_l_4(**kwargs):
     return MAGE_ViT_L_4(**kwargs)
 
 
-@register_model("mage.l_8")
+@register_model("mage.l_8", paper_url="https://arxiv.org/abs/2211.09117")
 def mage_l_8(**kwargs):
     return MAGE_ViT_L_8(**kwargs)
 
 
-@register_model("mage.l_16")
+@register_model("mage.l_16", paper_url="https://arxiv.org/abs/2211.09117")
 def mage_l_16(**kwargs):
     return MAGE_ViT_L_16(**kwargs)

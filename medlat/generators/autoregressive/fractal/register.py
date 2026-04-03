@@ -10,26 +10,26 @@ from .models import (
 __all__ = []
 
 
-@register_model("fractal.ar_64")
+@register_model("fractal.ar_64", paper_url="https://arxiv.org/abs/2501.05372")
 def fractal_ar_64(**kwargs):
     return FractalAR_in64(**kwargs)
 
 
-@register_model("fractal.mar_64")
+@register_model("fractal.mar_64", paper_url="https://arxiv.org/abs/2501.05372")
 def fractal_mar_64(**kwargs):
     return FractalMAR_in64(**kwargs)
 
 
-@register_model("fractal.mar_base_256")
+@register_model("fractal.mar_base_256", paper_url="https://arxiv.org/abs/2501.05372")
 def fractal_mar_base_256(**kwargs):
     return FractalMAR_base_in256(**kwargs)
 
 
-@register_model("fractal.mar_large_256")
+@register_model("fractal.mar_large_256", paper_url="https://arxiv.org/abs/2501.05372")
 def fractal_mar_large_256(**kwargs):
     return FractalMAR_large_in256(**kwargs)
 
 
-@register_model("fractal.mar_huge_256")
+@register_model("fractal.mar_huge_256", paper_url="https://arxiv.org/abs/2501.05372")
 def fractal_mar_huge_256(**kwargs):
     return FractalMAR_huge_in256(**kwargs)

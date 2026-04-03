@@ -7,7 +7,7 @@ __all__ = []
 Model configurations as taken from Table 14 in the paper
 """
 
-@register_model("ldm.f1")
+@register_model("ldm.f1", paper_url="https://arxiv.org/abs/2112.10752")
 def LDM_f1(img_size, in_channels=3, out_channels=3, model_channels=192, num_head_channels=32, **kwargs):
     return UNetModel(
         img_size=img_size,
@@ -21,7 +21,7 @@ def LDM_f1(img_size, in_channels=3, out_channels=3, model_channels=192, num_head
         **kwargs
     )
 
-@register_model("ldm.f2")
+@register_model("ldm.f2", paper_url="https://arxiv.org/abs/2112.10752")
 def LDM_f2(img_size, in_channels=3, out_channels=3, model_channels=192, num_head_channels=32, **kwargs):
     return UNetModel(
         img_size=img_size,
@@ -35,7 +35,7 @@ def LDM_f2(img_size, in_channels=3, out_channels=3, model_channels=192, num_head
         **kwargs
     )
 
-@register_model("ldm.f4")
+@register_model("ldm.f4", paper_url="https://arxiv.org/abs/2112.10752")
 def LDM_f4(img_size, in_channels=3, out_channels=3, model_channels=224, num_head_channels=32, **kwargs):
     return UNetModel(
         img_size=img_size,
@@ -49,7 +49,7 @@ def LDM_f4(img_size, in_channels=3, out_channels=3, model_channels=224, num_head
         **kwargs
     )
 
-@register_model("ldm.f8")
+@register_model("ldm.f8", paper_url="https://arxiv.org/abs/2112.10752")
 def LDM_f8(img_size, in_channels=4, out_channels=4, model_channels=256, num_head_channels=32, **kwargs):
     return UNetModel(
         img_size=img_size,
@@ -63,7 +63,7 @@ def LDM_f8(img_size, in_channels=4, out_channels=4, model_channels=256, num_head
         **kwargs
     )
 
-@register_model("ldm.f16")
+@register_model("ldm.f16", paper_url="https://arxiv.org/abs/2112.10752")
 def LDM_f16(img_size, in_channels=4, out_channels=4, model_channels=256, num_head_channels=32, **kwargs):
     return UNetModel(
         img_size=img_size,

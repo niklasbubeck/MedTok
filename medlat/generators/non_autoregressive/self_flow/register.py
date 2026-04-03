@@ -27,22 +27,22 @@ def _build(depth, hidden_size, num_heads, patch_size, **user_kwargs):
     )
 
 
-@register_model("self_flow.xl_2")
+@register_model("self_flow.xl_2", paper_url="https://arxiv.org/abs/2603.06507")
 def SelfFlow_XL_2(**kwargs):
     return _build(depth=28, hidden_size=1152, num_heads=16, patch_size=2, **kwargs)
 
 
-@register_model("self_flow.l_2")
+@register_model("self_flow.l_2", paper_url="https://arxiv.org/abs/2603.06507")
 def SelfFlow_L_2(**kwargs):
     return _build(depth=24, hidden_size=1024, num_heads=16, patch_size=2, **kwargs)
 
 
-@register_model("self_flow.b_2")
+@register_model("self_flow.b_2", paper_url="https://arxiv.org/abs/2603.06507")
 def SelfFlow_B_2(**kwargs):
     return _build(depth=12, hidden_size=768, num_heads=12, patch_size=2, **kwargs)
 
 
-@register_model("self_flow.s_2")
+@register_model("self_flow.s_2", paper_url="https://arxiv.org/abs/2603.06507")
 def SelfFlow_S_2(**kwargs):
     return _build(depth=12, hidden_size=384, num_heads=6, patch_size=2, **kwargs)
 
@@ -50,21 +50,21 @@ def SelfFlow_S_2(**kwargs):
 # patch_size=8 variants — suitable for direct pixel-space training on 64×64 images
 # (gives 64 tokens per image instead of 1024, much faster to prototype)
 
-@register_model("self_flow.xl_8")
+@register_model("self_flow.xl_8", paper_url="https://arxiv.org/abs/2603.06507")
 def SelfFlow_XL_8(**kwargs):
     return _build(depth=28, hidden_size=1152, num_heads=16, patch_size=8, **kwargs)
 
 
-@register_model("self_flow.l_8")
+@register_model("self_flow.l_8", paper_url="https://arxiv.org/abs/2603.06507")
 def SelfFlow_L_8(**kwargs):
     return _build(depth=24, hidden_size=1024, num_heads=16, patch_size=8, **kwargs)
 
 
-@register_model("self_flow.b_8")
+@register_model("self_flow.b_8", paper_url="https://arxiv.org/abs/2603.06507")
 def SelfFlow_B_8(**kwargs):
     return _build(depth=12, hidden_size=768, num_heads=12, patch_size=8, **kwargs)
 
 
-@register_model("self_flow.s_8")
+@register_model("self_flow.s_8", paper_url="https://arxiv.org/abs/2603.06507")
 def SelfFlow_S_8(**kwargs):
     return _build(depth=12, hidden_size=384, num_heads=6, patch_size=8, **kwargs)

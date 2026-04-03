@@ -900,27 +900,27 @@ sched = create_scheduler(<span class="s">"flow"</span>,     path_type=<span clas
           <tbody>
             <tr>
               <th scope="row">AEKL</th>
-              <td>LDM-style KL autoencoder. Conv encoder/decoder, 12 configs from <code>f4_d3</code> to <code>f32_d64</code>. The workhorse for diffusion-based generation.</td>
+              <td>LDM-style KL autoencoder. Conv encoder/decoder, 12 configs from <code>f4_d3</code> to <code>f32_d64</code>. The workhorse for diffusion-based generation. <a href="https://arxiv.org/abs/2112.10752" target="_blank" rel="noopener" style="color:var(--med);font-size:0.82rem">→ paper</a></td>
             </tr>
             <tr>
               <th scope="row">MAISI</th>
-              <td>MONAI MAISI 3D-friendly KL AE — <code>continuous.maisi.f4_d3</code></td>
+              <td>MONAI MAISI 3D-friendly KL AE — <code>continuous.maisi.f4_d3</code> <a href="https://arxiv.org/abs/2507.05622" target="_blank" rel="noopener" style="color:var(--med);font-size:0.82rem">→ paper</a></td>
             </tr>
             <tr>
               <th scope="row">MedVAE</th>
-              <td>KL AE with BiomedCLIP alignment for medical imaging — <code>continuous.medvae.f8_d16</code>, <code>f8_d32</code></td>
+              <td>KL AE with BiomedCLIP alignment for medical imaging — <code>continuous.medvae.f8_d16</code>, <code>f8_d32</code> <a href="https://arxiv.org/abs/2303.00915" target="_blank" rel="noopener" style="color:var(--med);font-size:0.82rem">→ paper</a></td>
             </tr>
             <tr>
               <th scope="row">VAVAE</th>
-              <td>Vision-foundation-aligned KL AE. Variants aligned to <strong>DINOv2</strong>, <strong>MAE</strong>, or <strong>BiomedCLIP</strong> — 9 configs at f8/f16 × d16/d32/d64.</td>
+              <td>Vision-foundation-aligned KL AE. Variants aligned to <strong>DINOv2</strong>, <strong>MAE</strong>, or <strong>BiomedCLIP</strong> — 9 configs at f8/f16 × d16/d32/d64. <a href="https://arxiv.org/abs/2501.01423" target="_blank" rel="noopener" style="color:var(--med);font-size:0.82rem">→ paper</a></td>
             </tr>
             <tr>
               <th scope="row">DCAE</th>
-              <td>EfficientViT DC-AE with very high compression ratios — <code>continuous.dcae.f32c32</code>, <code>f64c128</code>, <code>f128c512</code></td>
+              <td>EfficientViT DC-AE with very high compression ratios — <code>continuous.dcae.f32c32</code>, <code>f64c128</code>, <code>f128c512</code> <a href="https://arxiv.org/abs/2410.10733" target="_blank" rel="noopener" style="color:var(--med);font-size:0.82rem">→ paper</a></td>
             </tr>
             <tr>
               <th scope="row">SoftVQ / WQVAE</th>
-              <td>Continuous wrappers with soft or warped quantization — <code>continuous.soft_vq.*</code> (with optional DINOv2/BiomedCLIP alignment), <code>continuous.wqvae.f8_d4_e16384</code></td>
+              <td>Continuous wrappers with soft or warped quantization — <code>continuous.soft_vq.*</code> (with optional DINOv2/BiomedCLIP alignment), <code>continuous.wqvae.f8_d4_e16384</code> <a href="https://arxiv.org/abs/2412.09628" target="_blank" rel="noopener" style="color:var(--med);font-size:0.82rem">→ paper</a></td>
             </tr>
           </tbody>
         </table>
@@ -932,41 +932,49 @@ sched = create_scheduler(<span class="s">"flow"</span>,     path_type=<span clas
           <span class="tag tag-disc">VQ-VAE</span>
           <strong>Vector Quantization</strong>
           <span>VQGAN-style conv encoder/decoder. 12 configs, <code>f4–f16</code>, codebooks up to 16 384. <code>discrete.vq.*</code></span>
+          <a href="https://arxiv.org/abs/2012.09841" target="_blank" rel="noopener" style="display:block;margin-top:0.5rem;font-size:0.78rem;color:var(--med)">→ VQGAN paper</a>
         </article>
         <article class="mini-card">
           <span class="tag tag-disc">LFQ</span>
           <strong>Lookup-Free Quant.</strong>
           <span>Implicit codebook, bit-width controlled. 15 configs, <code>f4–f16</code>, bits 10–18. <code>discrete.lfq.*</code></span>
+          <a href="https://arxiv.org/abs/2310.05737" target="_blank" rel="noopener" style="display:block;margin-top:0.5rem;font-size:0.78rem;color:var(--med)">→ MagViT-v2 paper</a>
         </article>
         <article class="mini-card">
           <span class="tag tag-disc">BSQ</span>
           <strong>Binary Spherical Quant.</strong>
           <span>Binary representation on the sphere. Same sweep as LFQ. <code>discrete.bsq.*</code></span>
+          <a href="https://arxiv.org/abs/2501.05737" target="_blank" rel="noopener" style="display:block;margin-top:0.5rem;font-size:0.78rem;color:var(--med)">→ BSQ paper</a>
         </article>
         <article class="mini-card">
           <span class="tag tag-disc">FSQ</span>
           <strong>Finite Scalar Quant.</strong>
           <span>Per-channel finite alphabet quantization. <code>discrete.fsq.*</code></span>
+          <a href="https://arxiv.org/abs/2309.15505" target="_blank" rel="noopener" style="display:block;margin-top:0.5rem;font-size:0.78rem;color:var(--med)">→ FSQ paper</a>
         </article>
         <article class="mini-card">
           <span class="tag tag-disc">SimVQ</span>
           <strong>SimVQ</strong>
           <span>Simplified VQ with codebook collapse prevention. <code>discrete.simvq.*</code></span>
+          <a href="https://arxiv.org/abs/2411.02038" target="_blank" rel="noopener" style="display:block;margin-top:0.5rem;font-size:0.78rem;color:var(--med)">→ SimVQ paper</a>
         </article>
         <article class="mini-card">
           <span class="tag tag-disc">RQVAE</span>
           <strong>Residual Quant. VAE</strong>
           <span>Multi-level residual codebooks. Returns concatenated indices. <code>discrete.rqvae.*</code></span>
+          <a href="https://arxiv.org/abs/2203.01941" target="_blank" rel="noopener" style="display:block;margin-top:0.5rem;font-size:0.78rem;color:var(--med)">→ RQ-VAE paper</a>
         </article>
         <article class="mini-card">
           <span class="tag tag-disc">QINCo</span>
           <strong>QINCo family</strong>
           <span>Improved nearest-code quantizers and residual variants. <code>discrete.simple_qinco.*</code>, <code>discrete.qinco.*</code></span>
+          <a href="https://arxiv.org/abs/2404.02905" target="_blank" rel="noopener" style="display:block;margin-top:0.5rem;font-size:0.78rem;color:var(--med)">→ QINCo paper</a>
         </article>
         <article class="mini-card">
           <span class="tag tag-disc">HCVQ</span>
           <strong>Hybrid Conv/ViT VQ</strong>
           <span>Residual, soft, grouped, SD-VQ, MS-RQ and VAE presets. <code>discrete.hcvq.*</code></span>
+          <a href="https://arxiv.org/abs/2404.02905" target="_blank" rel="noopener" style="display:block;margin-top:0.5rem;font-size:0.78rem;color:var(--med)">→ paper</a>
         </article>
       </div>
 
@@ -975,14 +983,17 @@ sched = create_scheduler(<span class="s">"flow"</span>,     path_type=<span clas
         <article class="mini-card">
           <strong>TiTok</strong>
           <span>Compact 1-D token sequences for generation. Multiple scale/length presets. <code>token.titok.*</code></span>
+          <a href="https://arxiv.org/abs/2406.07550" target="_blank" rel="noopener" style="display:block;margin-top:0.5rem;font-size:0.78rem;color:var(--med)">→ TiTok paper</a>
         </article>
         <article class="mini-card">
           <strong>MAETok</strong>
           <span>MAE-style reconstruction tokenizer. <code>token.maetok.*</code></span>
+          <a href="https://arxiv.org/abs/2502.03444" target="_blank" rel="noopener" style="display:block;margin-top:0.5rem;font-size:0.78rem;color:var(--med)">→ MAETok paper</a>
         </article>
         <article class="mini-card">
           <strong>VMAE · DeTok · SoftVQ · ViTA</strong>
           <span>ViT-based and scale-grid tokenizers. <code>token.vmae.*</code>, <code>token.detok.*</code>, <code>token.vita.*</code></span>
+          <a href="https://arxiv.org/abs/2203.12602" target="_blank" rel="noopener" style="display:block;margin-top:0.5rem;font-size:0.78rem;color:var(--med)">→ VideoMAE paper</a>
         </article>
       </div>
     </section>
@@ -1001,21 +1012,25 @@ sched = create_scheduler(<span class="s">"flow"</span>,     path_type=<span clas
           <span class="tag tag-ar">MaskGIT</span>
           <strong>maskgit.b / .l / .h</strong>
           <span>Iterative masked token generation with cosine masking schedule. Standard interface: <code>wrapper(z, y=labels) → loss</code>. Works with any discrete tokenizer.</span>
+          <a href="https://arxiv.org/abs/2202.04200" target="_blank" rel="noopener" style="display:block;margin-top:0.5rem;font-size:0.78rem;color:var(--accent-2)">→ MaskGIT paper</a>
         </article>
         <article class="mini-card">
           <span class="tag tag-ar">MAGE</span>
           <strong>mage.xs_4 … mage.l_16</strong>
           <span>Masked Autoencoder as Generative model — ViT encoder/decoder on token grids. 12 configs (XS/S/B/L × patch 4/8/16). ⚠️ patch size suffix must match tokenizer <code>vae_stride</code>.</span>
+          <a href="https://arxiv.org/abs/2211.09117" target="_blank" rel="noopener" style="display:block;margin-top:0.5rem;font-size:0.78rem;color:var(--accent-2)">→ MAGE paper</a>
         </article>
         <article class="mini-card">
           <span class="tag tag-ar">Taming GPT</span>
           <strong>taming.gpt_b / .gpt_l / .gpt_h</strong>
           <span>Autoregressive next-token prediction (GPT-style). Classic causal transformer. Call as <code>generator(z[:-1], targets=z[1:])</code> for the AR loss.</span>
+          <a href="https://arxiv.org/abs/2012.09841" target="_blank" rel="noopener" style="display:block;margin-top:0.5rem;font-size:0.78rem;color:var(--accent-2)">→ Taming Transformers paper</a>
         </article>
         <article class="mini-card">
           <span class="tag tag-ar">MaskBit</span>
           <strong>maskbit.s / .b / .l · maskbit.bert_s / .b / .l</strong>
           <span>BERT-style masked generation. <code>LFQBert</code> variants for LFQ/BSQ tokenizers; <code>Bert</code> variants for VQ/FSQ tokenizers. Uses a custom masking training loop.</span>
+          <a href="https://arxiv.org/abs/2409.16211" target="_blank" rel="noopener" style="display:block;margin-top:0.5rem;font-size:0.78rem;color:var(--accent-2)">→ MaskBit paper</a>
         </article>
       </div>
 
@@ -1025,16 +1040,19 @@ sched = create_scheduler(<span class="s">"flow"</span>,     path_type=<span clas
           <span class="tag tag-ar">MAR</span>
           <strong>mar.b / .l / .h</strong>
           <span>Masked AutoRegressive model with diffusion loss on continuous tokens. Takes <code>(B, C, H, W)</code> latents. Supports both conditional (<code>y=labels</code>) and unconditional training. Standard interface: <code>wrapper(z, y=labels)</code>.</span>
+          <a href="https://arxiv.org/abs/2406.11838" target="_blank" rel="noopener" style="display:block;margin-top:0.5rem;font-size:0.78rem;color:var(--accent-2)">→ MAR paper</a>
         </article>
         <article class="mini-card">
           <span class="tag tag-ar">RAR</span>
           <strong>rar.b / .l / .xl / .h</strong>
           <span>Recurrent AutoRegressive model with diffusion loss. Expects flattened sequence <code>(B, seq_len, embed_dim)</code>. Use <code>force_one_d_seq</code> to bypass the built-in patch embedder.</span>
+          <a href="https://arxiv.org/abs/2411.00776" target="_blank" rel="noopener" style="display:block;margin-top:0.5rem;font-size:0.78rem;color:var(--accent-2)">→ RAR paper</a>
         </article>
         <article class="mini-card">
           <span class="tag tag-ar">FractalGen</span>
           <strong>fractal.ar_64 · fractal.mar_64 · fractal.mar_base/large/huge_256</strong>
           <span>Hierarchical fractal AR: multi-level MAR or AR cascade that progressively refines predictions. Requires a custom hierarchical training loop.</span>
+          <a href="https://arxiv.org/abs/2501.05372" target="_blank" rel="noopener" style="display:block;margin-top:0.5rem;font-size:0.78rem;color:var(--accent-2)">→ FractalGen paper</a>
         </article>
       </div>
 
@@ -1044,26 +1062,31 @@ sched = create_scheduler(<span class="s">"flow"</span>,     path_type=<span clas
           <span class="tag tag-gen">DiT</span>
           <strong>dit.s/b/l/xl × _1/_2/_4/_8</strong>
           <span>Diffusion Transformer — patchified continuous latents, adaLN class conditioning. 16 configs. Use with <code>create_gaussian_diffusion</code>.</span>
+          <a href="https://arxiv.org/abs/2212.09748" target="_blank" rel="noopener" style="display:block;margin-top:0.5rem;font-size:0.78rem;color:var(--accent-2)">→ DiT paper</a>
         </article>
         <article class="mini-card">
           <span class="tag tag-gen">MDT</span>
           <strong>mdt.s/b/l/xl × _2/_4</strong>
           <span>Masked Diffusion Transformer — encoder-decoder with masked side branches. 8 configs. Strong scaling on smaller latent grids.</span>
+          <a href="https://arxiv.org/abs/2303.04155" target="_blank" rel="noopener" style="display:block;margin-top:0.5rem;font-size:0.78rem;color:var(--accent-2)">→ MDT paper</a>
         </article>
         <article class="mini-card">
           <span class="tag tag-gen">UViT</span>
           <strong>uvit.small / .small_deep / .mid / .large / .huge</strong>
           <span>U-Net + ViT hybrid diffusion model. Skip connections between encoder and decoder blocks. 5 configs.</span>
+          <a href="https://arxiv.org/abs/2209.12152" target="_blank" rel="noopener" style="display:block;margin-top:0.5rem;font-size:0.78rem;color:var(--accent-2)">→ UViT paper</a>
         </article>
         <article class="mini-card">
           <span class="tag tag-gen">LDM</span>
           <strong>ldm.f1 … ldm.f16</strong>
           <span>Classic Latent Diffusion UNet. Multiple stride variants for different latent resolutions.</span>
+          <a href="https://arxiv.org/abs/2112.10752" target="_blank" rel="noopener" style="display:block;margin-top:0.5rem;font-size:0.78rem;color:var(--accent-2)">→ LDM paper</a>
         </article>
         <article class="mini-card">
           <span class="tag tag-gen">ADM</span>
           <strong>adm.diffusion.{64,128,256,512}{C,U}</strong>
           <span>Dhariwal–Nichol UNet diffusion + matching classifier heads. Resolution-specific configs. Also: <code>adm.classifier.*</code>.</span>
+          <a href="https://arxiv.org/abs/2105.05233" target="_blank" rel="noopener" style="display:block;margin-top:0.5rem;font-size:0.78rem;color:var(--accent-2)">→ ADM paper</a>
         </article>
       </div>
     </section>
