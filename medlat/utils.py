@@ -95,11 +95,16 @@ def _resolve_ckpt_path(path: str) -> str:
     return cached_path
 
 
-def init_from_ckpt(model, path: str, weights_only: bool = False) -> None:
+def init_from_ckpt(model, path: str, weights_only: bool = False, strict: bool = True) -> None:
     """
-    Load a checkpoint into ``model`` while remaining tolerant to shape mismatches.
+    Load a checkpoint into ``model``.
     Supports .ckpt/.pt and .safetensors files. If ``path`` is an http(s) URL, the
     checkpoint is downloaded and cached under ~/.cache/medlat/downloads.
+
+    Args:
+        strict: If True (default), all keys must match exactly. If False, missing or
+                unexpected keys are tolerated — useful for 2D→3D weight transfer.
+                Prefer keeping strict=True; passing strict=False is an explicit opt-in.
     """
     path = _resolve_ckpt_path(path)
     if not os.path.isfile(path):
@@ -145,12 +150,14 @@ def init_from_ckpt(model, path: str, weights_only: bool = False) -> None:
         cleaned[new_key] = value
 
     # --- Load into model ---
-    try:
+    if strict:
         msg = model.load_state_dict(cleaned, strict=True)
-    except RuntimeError as err:
-        logger.warning(f"Strict load failed: {err}")
-        logger.warning("Falling back to non-strict loading (often happens when mixing 2D/3D weights).")
-        msg = model.load_state_dict(cleaned, strict=False)
+    else:
+        try:
+            msg = model.load_state_dict(cleaned, strict=True)
+        except RuntimeError as err:
+            logger.warning(f"Strict load failed (strict=False was requested, falling back): {err}")
+            msg = model.load_state_dict(cleaned, strict=False)
 
     torch.cuda.empty_cache()
 
@@ -158,6 +165,47 @@ def init_from_ckpt(model, path: str, weights_only: bool = False) -> None:
     logger.debug("Missing keys: %s", msg.missing_keys)
     logger.debug("Unexpected keys: %s", msg.unexpected_keys)
     logger.info(f"Restored from {path}")
+
+
+def suggest_generator_params(tokenizer: nn.Module) -> dict:
+    """Return the keyword-arguments a compatible generator needs.
+
+    Given an instantiated first-stage tokenizer, this function inspects its
+    attributes and returns a dict you can ``**``-unpack directly into
+    :func:`~medlat.get_model` when building the paired generator.
+
+    Example::
+
+        tok = get_model("continuous.aekl.f8_d16", img_size=224)
+        gen = get_model("dit.xl_2", img_size=224, num_classes=1000,
+                        **suggest_generator_params(tok))
+        # No need to look up embed_dim / vae_stride manually.
+
+    Returns:
+        A dict that may contain any subset of the following keys:
+        ``vae_stride`` (int, spatial compression factor, e.g. 8),
+        ``in_channels`` (int, latent channel count for diffusion / continuous-AR generators),
+        ``codebook_size`` (int, for AR generators that use this param name),
+        ``num_tokens`` (int, alias for ``codebook_size`` used by some AR models).
+    """
+    fs_type = get_model_type(tokenizer)
+    params: dict = {}
+
+    if hasattr(tokenizer, "vae_stride"):
+        stride = tokenizer.vae_stride
+        params["vae_stride"] = stride[0] if isinstance(stride, (tuple, list)) else stride
+
+    if fs_type in ("continuous", "token"):
+        if hasattr(tokenizer, "embed_dim"):
+            params["in_channels"] = tokenizer.embed_dim
+    elif fs_type == "discrete":
+        if hasattr(tokenizer, "embed_dim"):
+            params["in_channels"] = tokenizer.embed_dim
+        if hasattr(tokenizer, "n_embed"):
+            params["codebook_size"] = tokenizer.n_embed
+            params["num_tokens"] = tokenizer.n_embed
+
+    return params
 
 
 def validate_compatibility(first_stage: nn.Module, generator: nn.Module) -> None:

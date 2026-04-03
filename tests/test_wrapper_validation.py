@@ -119,7 +119,21 @@ def test_scale_factor_updates_in_train():
             w.vae_encode(x)
 
     # After 3 steps the scale factor should have been updated
-    assert w.scale_factor.item() != initial_sf or w.scale_factor.item() != 1.0 or w._scale_step_counter > 0
+    assert w.scale_factor.item() != initial_sf and w._scale_step_counter > 0
+
+
+def test_vae_encode_non_square_input():
+    """GenWrapper encode/decode must work for non-square spatial inputs."""
+    from medlat import GenWrapper
+    H, W = 32, 64  # non-square
+    tok = _continuous_tok()  # f4 → latent is (H/4, W/4)
+    gen = _diffusion_gen()
+    w = GenWrapper(gen, tok)
+    w.eval()
+    x = torch.randn(1, 3, H, W)
+    with torch.no_grad():
+        z = w.vae_encode(x)
+    assert z.shape[0] == 1, "batch dim must be preserved for non-square input"
 
 
 def test_manual_scale_factor_never_mutates():

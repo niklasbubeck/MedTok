@@ -32,17 +32,17 @@ class GenerativeScheduler(Protocol):
     signatures below satisfies this protocol and can be used interchangeably via
     ``create_scheduler()``.
 
-    Sampler tokens by paradigm
-    --------------------------
-    Gaussian diffusion (``create_scheduler("diffusion", ...)``):
-        ``sampler="ddpm"``  — stochastic ancestral sampling (default)
-        ``sampler="ddim"``  — deterministic DDIM; pass ``eta=0.0`` (fully
-                              deterministic) or ``eta>0`` to re-introduce noise
+    **Sampler tokens by paradigm:**
 
-    Flow matching (``create_scheduler("flow", ...)``):
-        ``sampler="dopri5"`` — adaptive Dormand-Prince ODE solver (default)
-        ``sampler="euler"``  — fixed-step Euler
-        ``sampler="heun"``   — fixed-step Heun (2nd-order)
+    Gaussian diffusion — ``create_scheduler("diffusion", ...)``:
+    ``sampler="ddpm"`` stochastic ancestral sampling (default),
+    ``sampler="ddim"`` deterministic DDIM (pass ``eta=0.0`` for fully
+    deterministic, or ``eta>0`` to re-introduce noise).
+
+    Flow matching — ``create_scheduler("flow", ...)``:
+    ``sampler="dopri5"`` adaptive Dormand-Prince ODE solver (default),
+    ``sampler="euler"`` fixed-step Euler,
+    ``sampler="heun"`` fixed-step Heun (2nd-order).
     """
 
     def training_losses(
@@ -113,11 +113,15 @@ class FirstStageModel(nn.Module, ABC):
 
 
 class ContinuousFirstStage(FirstStageModel, ABC):
-    """
-    First-stage model with a continuous (e.g. Gaussian) latent space.
+    """First-stage model with a continuous (e.g. Gaussian) latent space.
 
-    encode(x) must return (z, loss, extra)
-    decode(z) must return reconstructed image tensor
+    ``encode(x)`` must return a 3-tuple ``(z, loss, extra)`` where ``z`` is the
+    latent tensor of shape ``(B, C, H', W')``, ``loss`` is a scalar auxiliary
+    regularisation loss (KL, perceptual, …), and ``extra`` is any
+    implementation-specific metadata (may be ``None``).
+
+    ``decode(z)`` must return a ``(B, C_in, H, W)`` float tensor — the reconstructed
+    image.
     """
 
     @property
@@ -127,14 +131,22 @@ class ContinuousFirstStage(FirstStageModel, ABC):
 
 
 class DiscreteFirstStage(FirstStageModel, ABC):
-    """
-    First-stage model with a discrete (codebook) latent space.
+    """First-stage model with a discrete (codebook) latent space.
 
-    encode(x) must return (quant, loss, info) where info = (_, _, indices)
-    decode(quant) must return reconstructed image tensor
-    decode_code(indices, out_shape) must return reconstructed image tensor
-    encode_to_prequant(x) must return (h, None, None)
-    decode_from_prequant(h) must return reconstructed image tensor
+    ``encode(x)`` must return a 3-tuple ``(quant, loss, info)`` where ``quant`` is the
+    quantized feature map ``(B, D, H', W')``, ``loss`` is a scalar codebook commitment
+    loss, and ``info`` is a 3-tuple whose last element contains the flat codebook
+    indices ``(B, H'*W')``, or a list of per-stage tensors for residual VQ.
+
+    ``decode(quant)`` must return a ``(B, C_in, H, W)`` float tensor.
+
+    ``decode_code(indices, out_shape)`` must return a ``(B, C_in, H, W)`` float tensor.
+
+    ``encode_to_prequant(x)`` must return ``(h, None, None)`` where ``h`` is the
+    pre-quantization feature map ``(B, D, H', W')``.
+
+    ``decode_from_prequant(h)`` quantizes ``h`` and returns a ``(B, C_in, H, W)``
+    tensor.
     """
 
     @property

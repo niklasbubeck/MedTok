@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Iterable, Optional
 
@@ -82,8 +83,10 @@ class ModelRegistry:
         key = self._normalize(name)
         if not override and key in self._registry:
             raise ValueError(f"Model '{name}' already registered.")
+        # Store the canonical (original-case) name in the entry so that
+        # error messages and available_models() can show it as registered.
         entry = ModelEntry(
-            name=key,
+            name=name,
             builder=builder,
             code_url=code_url,
             description=description,
@@ -99,8 +102,9 @@ class ModelRegistry:
         try:
             return self._registry[key]
         except KeyError as exc:
+            canonical_names = sorted(e.name for e in self._registry.values())
             raise KeyError(
-                f"Unknown model '{name}'. Available models: {sorted(self._registry)}"
+                f"Unknown model '{name}'. Available models: {canonical_names}"
             ) from exc
 
     def get_info(self, name: str) -> ModelInfo:
@@ -112,9 +116,11 @@ class ModelRegistry:
 
     def available(self, prefix: Optional[str] = None) -> Iterable[str]:
         if prefix is None:
-            return tuple(sorted(self._registry))
+            return tuple(sorted(e.name for e in self._registry.values()))
         normalized = self._normalize(prefix)
-        return tuple(sorted(name for name in self._registry if name.startswith(normalized)))
+        return tuple(
+            sorted(e.name for key, e in self._registry.items() if key.startswith(normalized))
+        )
 
 
 MODEL_REGISTRY = ModelRegistry()
@@ -156,6 +162,49 @@ def register_model(
 def get_model(name: str, *args: Any, **kwargs: Any) -> Any:
     """Instantiate a registered model."""
     return MODEL_REGISTRY.create(name, *args, **kwargs)
+
+
+def get_model_signature(name: str) -> Dict[str, Any]:
+    """Return the parameter signature of a registered model builder.
+
+    Introspects the builder function registered under ``name`` and returns a
+    dict mapping each parameter name to its default value.  Parameters with no
+    default are represented by the sentinel string ``'<required>'``.
+
+    ``**kwargs`` catch-alls are omitted — they are implementation details of
+    individual builders, not part of the public interface.
+
+    Example::
+
+        from medlat import get_model_signature
+
+        sig = get_model_signature("dit.xl_2")
+        # → {'img_size': '<required>', 'vae_stride': '<required>',
+        #    'in_channels': '<required>', 'num_classes': 10, ...}
+
+        # Discover required parameters at a glance:
+        required = [k for k, v in sig.items() if v == '<required>']
+
+    Args:
+        name: registered model identifier (case-insensitive).
+
+    Returns:
+        Ordered dict of parameter names → default values (or ``'<required>'``).
+    """
+    entry = MODEL_REGISTRY.get(name)
+    sig = inspect.signature(entry.builder)
+    result: Dict[str, Any] = {}
+    for param_name, param in sig.parameters.items():
+        if param.kind in (
+            inspect.Parameter.VAR_KEYWORD,
+            inspect.Parameter.VAR_POSITIONAL,
+        ):
+            continue
+        if param.default is inspect.Parameter.empty:
+            result[param_name] = "<required>"
+        else:
+            result[param_name] = param.default
+    return result
 
 
 def get_model_info(name: str) -> ModelInfo:

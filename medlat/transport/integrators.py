@@ -27,8 +27,8 @@ class sde:
         self.sampler_type = sampler_type
 
     def __Euler_Maruyama_step(self, x, mean_x, t, model, **model_kwargs):
-        w_cur = th.randn(x.size()).to(x)
-        t = th.ones(x.size(0)).to(x) * t
+        w_cur = th.empty_like(x).normal_()
+        t = th.full((x.size(0),), t.item(), dtype=x.dtype, device=x.device)
         dw = w_cur * th.sqrt(self.dt)
         drift = self.drift(x, t, model, **model_kwargs)
         diffusion = self.diffusion(x, t)
@@ -37,9 +37,9 @@ class sde:
         return x, mean_x
     
     def __Heun_step(self, x, _, t, model, **model_kwargs):
-        w_cur = th.randn(x.size()).to(x)
+        w_cur = th.empty_like(x).normal_()
         dw = w_cur * th.sqrt(self.dt)
-        t_cur = th.ones(x.size(0)).to(x) * t
+        t_cur = th.full((x.size(0),), t.item(), dtype=x.dtype, device=x.device)
         diffusion = self.diffusion(x, t_cur)
         xhat = x + th.sqrt(2 * diffusion) * dw
         K1 = self.drift(xhat, t_cur, model, **model_kwargs)
@@ -56,7 +56,7 @@ class sde:
 
         try:
             sampler = sampler_dict[self.sampler_type]
-        except:
+        except KeyError:
             raise NotImplementedError("Smapler type not implemented.")
     
         return sampler
@@ -94,22 +94,23 @@ class ode:
         self.t = th.linspace(t0, t1, num_steps)
 
         if timestep_shift > 0:
-            def compute_tm(t_n, timestep_shift):
-                numerator = timestep_shift * t_n
-                denominator = 1 + (timestep_shift - 1) * t_n
-                return numerator / denominator
-            self.t = th.tensor([compute_tm(t_n, timestep_shift) for t_n in self.t])
+            s = timestep_shift
+            self.t = (s * self.t) / (1 + (s - 1) * self.t)
 
         self.atol = atol
         self.rtol = rtol
         self.sampler_type = sampler_type
 
     def sample(self, x, model, **model_kwargs):
-        
+
         device = x[0].device if isinstance(x, tuple) else x.device
+        B = x[0].size(0) if isinstance(x, tuple) else x.size(0)
+        # Pre-allocate a (B,) buffer reused on every ODE evaluation call
+        _t_buf = th.empty(B, device=device)
+
         def _fn(t, x):
-            t = th.ones(x[0].size(0)).to(device) * t if isinstance(x, tuple) else th.ones(x.size(0)).to(device) * t
-            model_output = self.drift(x, t, model, **model_kwargs)
+            _t_buf.fill_(t.item() if th.is_tensor(t) else t)
+            model_output = self.drift(x, _t_buf, model, **model_kwargs)
             return model_output
 
         t = self.t.to(device)

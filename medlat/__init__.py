@@ -1,5 +1,5 @@
-from .first_stage import *  # noqa: F401,F403
-from .generators import *  # noqa: F401,F403
+from . import first_stage as _first_stage  # noqa: F401 — triggers model registration
+from . import generators as _generators  # noqa: F401 — triggers model registration
 from .modules.wrapper import GenWrapper
 from .registry import (
     MODEL_REGISTRY,
@@ -7,9 +7,10 @@ from .registry import (
     available_models,
     get_model,
     get_model_info,
+    get_model_signature,
     register_model,
 )
-from .utils import validate_compatibility
+from .utils import validate_compatibility, suggest_generator_params
 from .base import (
     FirstStageModel,
     ContinuousFirstStage,
@@ -20,7 +21,13 @@ from .base import (
     NonAutoregressiveGenerator,
     GenerativeScheduler,
 )
-from .scheduling import create_scheduler, DualTimestepScheduler
+from .scheduling import (
+    create_scheduler,
+    DualTimestepScheduler,
+    SchedulerInfo,
+    available_schedulers,
+    scheduler_info,
+)
 
 __all__ = [
     "MODEL_REGISTRY",
@@ -28,9 +35,11 @@ __all__ = [
     "available_models",
     "get_model",
     "get_model_info",
+    "get_model_signature",
     "register_model",
     "GenWrapper",
     "validate_compatibility",
+    "suggest_generator_params",
     "FirstStageModel",
     "ContinuousFirstStage",
     "DiscreteFirstStage",
@@ -41,4 +50,7 @@ __all__ = [
     "GenerativeScheduler",
     "create_scheduler",
     "DualTimestepScheduler",
+    "SchedulerInfo",
+    "available_schedulers",
+    "scheduler_info",
 ]

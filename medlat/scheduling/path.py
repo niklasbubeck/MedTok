@@ -30,7 +30,7 @@ class ICPlan:
 
     def compute_d_alpha_alpha_ratio_t(self, t):
         """Compute the ratio between d_alpha and alpha"""
-        return 1 / t
+        return 1 / t.clamp(min=1e-5)
 
     def compute_drift(self, x, t):
         """We always output sde according to score parametrization; """

@@ -165,14 +165,46 @@ class HOGGenerator(nn.Module):
 def mean_flat(x):
     return torch.mean(x, dim=list(range(1, len(x.size()))))
 
+
+class _Normalize(nn.Module):
+    """Channel-wise normalisation: (x - mean) / std. Buffers stay on the correct device."""
+    def __init__(self, mean, std):
+        super().__init__()
+        self.register_buffer('mean', torch.tensor(mean).view(1, -1, 1, 1))
+        self.register_buffer('std', torch.tensor(std).view(1, -1, 1, 1))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return (x - self.mean) / self.std
+
+
+class _Denormalize(nn.Module):
+    """Inverse of _Normalize: x * std + mean."""
+    def __init__(self, mean, std):
+        super().__init__()
+        self.register_buffer('mean', torch.tensor(mean).view(1, -1, 1, 1))
+        self.register_buffer('std', torch.tensor(std).view(1, -1, 1, 1))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return x * self.std + self.mean
+
+
 class AlignmentModule(ABC, nn.Module):
-    """
-    Base class for auxiliary alignment modules.
-    Each module:
-      - contains a decoder (MAETokViTDecoder)
-      - contains projection heads (post_quant_conv and to_pixel)
-      - contains a target model (frozen or external callable)
-    Subclasses must implement `compute_target` to obtain the target representation for an input image.
+    """Base class for auxiliary alignment modules.
+
+    Each module contains a decoder (``MAETokViTDecoder``), projection heads
+    (``post_quant_conv`` and ``to_pixel``), and a target model (frozen or
+    external callable). Subclasses must implement ``compute_target`` to obtain
+    the target representation for an input image.
+
+    **Decoder interface contract** — subclasses that call a decoder must conform
+    to the following signature::
+
+        decoder(x, interpolate_zq, H, W, D) -> Tensor  # (B, L, embed_dim)
+
+    where ``x`` is the post-projected token sequence ``(B, L, codebook_embed_dim)``,
+    ``interpolate_zq`` is the raw quant tokens for skip connections (or ``None``),
+    and ``H, W, D`` are the spatial dimensions (pass ``None`` for 2-D inputs).
+    The decoder must return a token sequence shaped ``(B, L, embed_dim)``.
     """
 
     def __init__(self, name: str):
@@ -252,10 +284,26 @@ class AlignmentModule(ABC, nn.Module):
         return
 
     def _infer_grid_hw(self, seq_len: int) -> Tuple[int, int]:
-        """Infer a square grid (h, w) from sequence length."""
+        """Infer a square grid (h, w) from sequence length.
+
+        Assumes the token sequence folds into a square spatial grid, i.e.
+        seq_len must be a perfect square (e.g. 256 → 16×16).
+
+        Non-square inputs are not supported here.  If your model produces
+        non-square token grids (e.g. 192×256 image with patch_size=16 → 12×16
+        tokens), override ``_interpolate_tokens_to_match`` in the subclass and
+        track H/W explicitly.
+
+        Raises:
+            ValueError: if seq_len is not a perfect square.
+        """
         side = int(math.sqrt(seq_len))
         if side * side != seq_len:
-            raise ValueError(f"Cannot infer square grid from seq_len={seq_len}")
+            raise ValueError(
+                f"Cannot infer square grid from seq_len={seq_len}. "
+                "AlignmentModule assumes square token grids. For non-square grids "
+                "override _interpolate_tokens_to_match in the subclass."
+            )
         return side, side
 
     def _interpolate_tokens_to_match(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
@@ -315,7 +363,9 @@ class HOGAlignment(AlignmentModule):
     def ensure_projection_dim(self, target_dim: int):
         # Rebuild projection if target channels change with image size
         if self.to_pixel.out_features != target_dim:
+            requires_grad = self.to_pixel.weight.requires_grad
             self.to_pixel = nn.Linear(self.decoder.embed_dim, target_dim).to(self.to_pixel.weight.device)
+            self.to_pixel.requires_grad_(requires_grad)
 
     def compute_target(self, x: torch.Tensor) -> torch.Tensor:
         # HOG generator returns (B, L, 108) presumably
@@ -359,9 +409,9 @@ class DinoAlignment(AlignmentModule):
             p.requires_grad = False
         self.repa_model.eval()
         
-        # Normalization for DINO (ImageNet normalization)
-        self.normalize = self._create_normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-        self.denormalize = self._create_denormalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        # Normalize inputs to ImageNet statistics expected by DINOv2.
+        # Assumes input images are in [0, 1] range (standard for VAE training).
+        self.normalize = _Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         
         # Use provided decoder
         self.decoder = decoder
@@ -370,30 +420,9 @@ class DinoAlignment(AlignmentModule):
         self.to_pixel = nn.Linear(self.decoder.embed_dim, self.repa_model.embed_dim)
         self.dino_use_movq = use_movq
     
-    def _create_normalize(self, mean, std):
-        class Normalize(nn.Module):
-            def __init__(self, mean, std):
-                super().__init__()
-                self.register_buffer('mean', torch.tensor(mean).view(1, -1, 1, 1))
-                self.register_buffer('std', torch.tensor(std).view(1, -1, 1, 1))
-            def forward(self, x):
-                return (x - self.mean) / self.std
-        return Normalize(mean, std)
-    
-    def _create_denormalize(self, mean, std):
-        class Denormalize(nn.Module):
-            def __init__(self, mean, std):
-                super().__init__()
-                self.register_buffer('mean', torch.tensor(mean).view(1, -1, 1, 1))
-                self.register_buffer('std', torch.tensor(std).view(1, -1, 1, 1))
-            def forward(self, x):
-                return x * self.std + self.mean
-        return Denormalize(mean, std)
-
     def compute_target(self, x: torch.Tensor) -> torch.Tensor:
-        # Preprocess for repa_model: normalize using ImageNet stats
-        # First denormalize from [0, 1] to ImageNet range, then normalize
-        x_normalized = self.normalize(self.denormalize(x))
+        # Input expected in [0, 1]; normalize to ImageNet mean/std for DINOv2.
+        x_normalized = self.normalize(x)
         z = self.repa_model.forward_features(x_normalized)[:, self.repa_model.num_prefix_tokens:]
         return z
 
@@ -433,39 +462,20 @@ class ClipAlignment(AlignmentModule):
         # but the model returns flattened tokens (B, L, C)
         self.clip_model.eval()
         
-        # Normalization for CLIP
-        self.normalize = self._create_normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-        self.denormalize = self._create_denormalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
-        
+        # Normalization for CLIP: input expected in [-1, 1] (mean=0.5, std=0.5).
+        # denormalize maps [-1,1] → [0,1], normalize applies ImageNet stats.
+        self.normalize = _Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        self.denormalize = _Denormalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
+
         # Use provided decoder
         self.decoder = decoder
         self.post_quant_conv = nn.Linear(codebook_embed_dim, self.decoder.embed_dim)
         self.to_pixel = nn.Linear(self.decoder.embed_dim, self.clip_model.embed_dim)
         self.clip_use_movq = use_movq
-    
-    def _create_normalize(self, mean, std):
-        class Normalize(nn.Module):
-            def __init__(self, mean, std):
-                super().__init__()
-                self.register_buffer('mean', torch.tensor(mean).view(1, -1, 1, 1))
-                self.register_buffer('std', torch.tensor(std).view(1, -1, 1, 1))
-            def forward(self, x):
-                return (x - self.mean) / self.std
-        return Normalize(mean, std)
-    
-    def _create_denormalize(self, mean, std):
-        class Denormalize(nn.Module):
-            def __init__(self, mean, std):
-                super().__init__()
-                self.register_buffer('mean', torch.tensor(mean).view(1, -1, 1, 1))
-                self.register_buffer('std', torch.tensor(std).view(1, -1, 1, 1))
-            def forward(self, x):
-                return x * self.std + self.mean
-        return Denormalize(mean, std)
 
     def compute_target(self, x: torch.Tensor) -> torch.Tensor:
-        # Preprocess for clip_model: normalize using ImageNet stats
-        # First denormalize from [0, 1] to ImageNet range, then normalize
+        # Input expected in [-1, 1] (mean=0.5, std=0.5 normalization).
+        # denormalize maps [-1,1] → [0,1], then normalize applies ImageNet stats.
         x_normalized = self.normalize(self.denormalize(x))
         z = self.clip_model.forward_features(x_normalized)[:, self.clip_model.num_prefix_tokens:]
         return z
@@ -597,16 +607,19 @@ class FoundationFeatureExtractor(nn.Module):
         b, c, h, w = x.shape
         if self.model_type == "dinov2":
             # DINOv2 expects 224x224 crops; resize then reshape tokens back to spatial grid.
-            x_resized = nn.functional.interpolate(x, size=(224, 224), mode='bilinear', align_corners=False)
-            tokens = self.model.forward_features(x_resized)[:, 1:]
+            if x.shape[-2:] != (224, 224):
+                x = nn.functional.interpolate(x, size=(224, 224), mode='bilinear', align_corners=False)
+            tokens = self.model.forward_features(x)[:, 1:]
             # DINOv2 with patch_size=14 on 224x224 gives 16x16 patches
             feat_h = 224 // 14  # = 16
             feat_w = 224 // 14  # = 16
             return tokens.reshape(b, feat_h, feat_w, -1).permute(0, 3, 1, 2)
         if self.model_type == "biomedclip":
             # BiomedCLIP ViT-B/16: use encode_image, returns (B, D)
-            x_resized = nn.functional.interpolate(x, size=(self.base_size, self.base_size), mode='bilinear', align_corners=False)
-            x_norm = (x_resized - self.biomed_mean.to(x_resized.device)) / self.biomed_std.to(x_resized.device)
+            target_size = (self.base_size, self.base_size)
+            if x.shape[-2:] != target_size:
+                x = nn.functional.interpolate(x, size=target_size, mode='bilinear', align_corners=False)
+            x_norm = (x - self.biomed_mean) / self.biomed_std
             emb = self.model.encode_image(x_norm)  # (B, D)
             return emb.unsqueeze(-1).unsqueeze(-1)  # (B, D, 1, 1)
 
@@ -619,11 +632,10 @@ class FoundationFeatureExtractor(nn.Module):
 
 
 class VFFoundationAlignment(AlignmentModule):
-    """
-    Align latent feature maps from the autoencoder with frozen vision foundation
-    model features using a two-part VF loss:
-      - vf_loss_1: similarity-matrix distance with margin
-      - vf_loss_2: per-location cosine margin
+    """Align latent feature maps with frozen vision foundation model features.
+
+    Uses a two-part VF loss: ``vf_loss_1`` computes similarity-matrix distance
+    with a margin, and ``vf_loss_2`` computes a per-location cosine margin loss.
     """
 
     def __init__(
@@ -706,17 +718,23 @@ class VFFoundationAlignment(AlignmentModule):
 
         # Compute VF losses
         b, c, h, w = z_proj.shape
-        z_flat = z_proj.view(b, c, -1)
+        z_flat = z_proj.view(b, c, -1)           # (B, C, N)
         aux_flat = aux_proj.view(b, aux_proj.shape[1], -1)
 
-        z_norm = torch.nn.functional.normalize(z_flat, dim=1)
+        z_norm = torch.nn.functional.normalize(z_flat, dim=1)    # (B, C, N)
         aux_norm = torch.nn.functional.normalize(aux_flat, dim=1)
 
-        z_cos_sim = torch.einsum('bci,bcj->bij', z_norm, z_norm)
-        aux_cos_sim = torch.einsum('bci,bcj->bij', aux_norm, aux_norm)
-        diff = torch.abs(z_cos_sim - aux_cos_sim)
-
+        # Compute loss_1 using bmm (faster than einsum for this contraction).
+        # bmm(Zᵀ, Z) is mathematically identical to einsum('bci,bcj->bij', Z, Z):
+        #   result[b,i,j] = sum_c Z[b,c,i] * Z[b,c,j]
+        # Out-of-place ops required: z_sim is a non-leaf tensor in the autograd
+        # graph (gradients flow through linear_proj), so in-place modification
+        # would corrupt the graph and raise a version-counter error during backward.
+        z_sim = torch.bmm(z_norm.transpose(1, 2), z_norm)        # (B, N, N)
+        aux_sim = torch.bmm(aux_norm.transpose(1, 2), aux_norm)   # (B, N, N)
+        diff = (z_sim - aux_sim).abs()
         vf_loss_1 = torch.nn.functional.relu(diff - self.distmat_margin).mean()
+        del z_sim, aux_sim, diff  # free large intermediates before vf_loss_2
         vf_loss_2 = torch.nn.functional.relu(
             1 - self.cos_margin - torch.nn.functional.cosine_similarity(aux_proj, z_proj, dim=1)
         ).mean()

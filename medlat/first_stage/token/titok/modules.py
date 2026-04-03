@@ -86,7 +86,7 @@ else:
         import xformers
         import xformers.ops
         ATTENTION_MODE = 'xformers'
-    except:
+    except ImportError:
         ATTENTION_MODE = 'math'
 logging.getLogger(__name__).debug(f'attention mode is {ATTENTION_MODE}')
 
